@@ -47,6 +47,7 @@
   .fileitem { background: #10131a; border: 1px solid #2a3140; border-radius: 8px; padding: 8px 10px; margin-top: 6px; display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; }
   .fileitem button { width: auto; padding: 6px 10px; font-size: 12px; margin: 0; }
   .hint { font-size: 12px; color: #9aa3b5; margin-top: 6px; }
+  .toast { display: none; position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 50; background: #1b1f27; border: 2px solid #2ea043; color: #e8eaf0; border-radius: 10px; padding: 12px 16px; font-size: 14px; font-weight: 600; max-width: 92%; box-shadow: 0 4px 24px rgba(0,0,0,.5); text-align: center; }
   /* ---- printable sheet ---- */
   #sheet { display: none; }
   @media print {
@@ -63,7 +64,7 @@
 <body>
 <header>
   <h1>CAMSheet</h1>
-  <p>VERSION 1.6 • ANDROID • OFFLINE — ported from CAMSheet-v4 pipeline</p>
+  <p>VERSION 1.7 • ANDROID • OFFLINE — ported from CAMSheet-v4 pipeline</p>
 </header>
 <main>
   <div class="card">
@@ -171,6 +172,7 @@
 
 <!-- printable sheet -->
 <div id="sheet"></div>
+<div id="toast" class="toast"></div>
 
 <script>
 "use strict";
@@ -982,6 +984,16 @@ function buildDocx() {
 function $(id){ return document.getElementById(id); }
 function esc(s){ return String(s == null ? "" : s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
 function status(t){ $("status").textContent = t; }
+var toastTimer = null;
+function toast(msg, isErr) {
+  var t = $("toast");
+  t.textContent = msg;
+  t.style.borderColor = isErr ? "#f85149" : "#2ea043";
+  t.style.display = "block";
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(function(){ t.style.display = "none"; }, 3000);
+}
+function report(msg, isErr) { status(msg); toast(msg, isErr); }
 function downloadBlob(name, blob, done) {
   done = done || function(){};
   // Android WebView cannot download blob: URLs, so hand the bytes to native code.
@@ -1017,7 +1029,7 @@ function downloadBlob(name, blob, done) {
 }
 function download(name, text, type) {
   downloadBlob(name, new Blob([text], { type: type || "text/plain;charset=utf-8" }), function(err){
-    status(err ? ("Download failed: " + err) : ("Saved '" + name + "' — check your phone's Downloads folder."));
+    report(err ? ("Download failed: " + err) : ("Saved '" + name + "' — check your phone's Downloads folder."), !!err);
   });
 }
 
@@ -1399,21 +1411,21 @@ $("progzipAny").addEventListener("change", function(e){
   unpackZipFile(f);
 });
 $("btnCompare").addEventListener("click", function(){
-  if (!rows.length) { status("Import NX HTML first, then compare."); return; }
-  if (!progFiles.length) { status("Pick .ptp/.MPF program files first."); return; }
+  if (!rows.length) { report("Import NX HTML first, then compare.", true); return; }
+  if (!progFiles.length) { report("Pick .ptp/.MPF program files first.", true); return; }
   var s = runProgramCompare();
-  status("Program check: " + s.match + " match, " + s.mismatch + " mismatch, " + s.missing + " not found (" + progFiles.length + " files). Green/red pills on each row; details go into Word/CSV exports.");
+  report("Program check: " + s.match + " match, " + s.mismatch + " mismatch, " + s.missing + " not found (" + progFiles.length + " files).");
 });
 $("btnDocx").addEventListener("click", function(){
-  if (!rows.length) { status("Nothing to export — import NX HTML first."); return; }
+  if (!rows.length) { report("Nothing to export — import NX HTML first.", true); return; }
   try {
     var name = (($("part").value || "camsheet") + "_sheet.docx").replace(/[\\/:*?"<>|]/g, "_");
     var blob = buildDocx();
     status("Building Word file...");
     downloadBlob(name, blob, function(err){
-      status(err ? ("Word export failed: " + err) : ("Saved '" + name + "' — check your phone's Downloads folder."));
+      report(err ? ("Word export failed: " + err) : ("Saved '" + name + "' — check your phone's Downloads folder."), !!err);
     });
-  } catch (err) { status("Word export failed: " + err.message); }
+  } catch (err) { report("Word export failed: " + err.message, true); }
 });
 $("descReset").addEventListener("click", function(){ customDesc = Object.assign({}, DEFAULT_DESC); refreshDescTable(); retransform(); });
 $("trAddBtn").addEventListener("click", function(){
@@ -1465,28 +1477,27 @@ function sheetHtml() {
   return h;
 }
 $("btnPrint").addEventListener("click", function(){
-  if (!rows.length) { status("Nothing to print — import NX HTML first."); return; }
+  if (!rows.length) { report("Nothing to print — import NX HTML first.", true); return; }
   $("sheet").innerHTML = sheetHtml();
   var bridge = (typeof TurnAppNative !== "undefined") ? TurnAppNative : null;
   if (bridge && bridge.printPage) {
     try {
       var back = String(bridge.printPage());
-      status(back.indexOf("ERROR:") === 0
-        ? ("Open print view failed: " + back.slice(6) + ". Use 'Download sheet (.html)' instead, then print from Chrome.")
-        : "Android print opened — choose 'Save as PDF' to make a PDF.");
+      report(back.indexOf("ERROR:") === 0
+        ? ("Print failed: " + back.slice(6) + ". Use 'Download sheet (.html)' instead, then print from Chrome.")
+        : "Android print opened — choose 'Save as PDF' to make a PDF.", back.indexOf("ERROR:") === 0);
       return;
-    } catch (err) { status("Print failed: " + err.message); return; }
+    } catch (err) { report("Print failed: " + err.message, true); return; }
   }
   window.print();
 });
 $("btnHtml").addEventListener("click", function(){
-  if (!rows.length) { status("Nothing to export — import NX HTML first."); return; }
+  if (!rows.length) { report("Nothing to export — import NX HTML first.", true); return; }
   var html = "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>Shop Documentation</title></head><body>" + sheetHtml() + "</body></html>";
   download((($("part").value || "camsheet") + "_sheet.html").replace(/[\\/:*?"<>|]/g, "_"), html, "text/html;charset=utf-8");
-  status("Sheet HTML downloaded (check Downloads).");
 });
 $("btnCsv").addEventListener("click", function(){
-  if (!rows.length) { status("Nothing to export — import NX HTML first."); return; }
+  if (!rows.length) { report("Nothing to export — import NX HTML first.", true); return; }
   function q(v){ v = String(v == null ? "" : v); return /[",\n]/.test(v) ? "\"" + v.replace(/"/g, "\"\"") + "\"" : v; }
   var cols = visibleCols();
   var lines = [cols.map(function(c){ return c.key; }).concat(["Tool_Full", "Setup", "Geometry", "Enabled", "Type", "ProgramStatus", "ProgramFile", "MismatchFields"]).map(q).join(",")];
@@ -1500,7 +1511,6 @@ $("btnCsv").addEventListener("click", function(){
     lines.push(cols.map(function(c){ return colValue(r, c, n); }).concat([r.tool_name, r.setup, r.geometry, r.enabled ? "yes" : "no", "operation", r.program_status || "", r.program_file || "", formatMismatch(r.program_mismatch_fields)]).map(q).join(","));
   });
   download((($("part").value || "camsheet") + "_table.csv").replace(/[\\/:*?"<>|]/g, "_"), lines.join("\n"), "text/csv;charset=utf-8");
-  status("CSV downloaded: " + n + " operations.");
 });
 $("btnSave").addEventListener("click", function(){
   var proj = { app: "camsheet-turnapp", version: 4, part: $("part").value, programmer: $("prog").value,
@@ -1511,7 +1521,6 @@ $("btnSave").addEventListener("click", function(){
     progFiles: progFiles.map(function(f){ return { name: f.name, text: f.text }; }),
     customDesc: customDesc, toolRule: toolRule, rows: rows };
   download((($("part").value || "camsheet") + ".camsheet.json").replace(/[\\/:*?"<>|]/g, "_"), JSON.stringify(proj, null, 1), "application/json");
-  status("Project saved (.json) — check your phone's Downloads folder; keep it to reopen later or on PC.");
 });
 $("btnLoadPick").addEventListener("click", function(){ $("projfile").click(); });
 $("projfile").addEventListener("change", function(e){
