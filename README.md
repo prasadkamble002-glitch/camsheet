@@ -15,6 +15,7 @@ builds the APK.
 ```
 turn app/
   README.md                  <- you are here
+  CAMSHEET_TO_ANDROID.md     <- full playbook: how CAMSheet was converted + GitHub build diary (read before converting your next app)
   HOW_TO_ADD_YOUR_APP.md     <- simple steps for non-coders
   apps.json                  <- list of your apps
   apps/renumber/index.html   <- WORKING DEMO (your RENUMBER tool, now on phone)
