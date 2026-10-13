@@ -10,6 +10,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      ANDROID_HOME: /tmp/android-sdk
+
     steps:
       - uses: actions/checkout@v4
 
@@ -25,11 +28,23 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - uses: android-actions/setup-android@v3
+      - name: Install Android cmdline-tools + SDK
+        run: |
+          mkdir -p "$ANDROID_HOME/cmdline-tools"
+          cd /tmp
+          curl -sSLo cmdtools.zip https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
+          unzip -q cmdtools.zip -d ct
+          rm -rf "$ANDROID_HOME/cmdline-tools/latest"
+          mv ct/cmdline-tools "$ANDROID_HOME/cmdline-tools/latest"
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platform-tools" "platforms;android-34" "build-tools;34.0.0"
 
       - name: Install Gradle 8.7
         run: |
-          cd /tmp && wget -q https://services.gradle.org/distributions/gradle-8.7-bin.zip && unzip -q gradle-8.7-bin.zip && echo "/tmp/gradle-8.7/bin" >> $GITHUB_PATH
+          cd /tmp
+          curl -sSLo gradle.zip https://services.gradle.org/distributions/gradle-8.7-bin.zip
+          unzip -q gradle.zip
+          echo "/tmp/gradle-8.7/bin" >> $GITHUB_PATH
 
       - name: Stage template + inject app
         run: |
@@ -50,11 +65,10 @@ jobs:
           sed -i "s/versionName = \".*\"/versionName = \"$VNAME\"/" ".build/$APP/app/build.gradle"
           sed -i "s/android:label=\".*\"/android:label=\"$TITLE\"/" ".build/$APP/app/src/main/AndroidManifest.xml"
           sed -i "s|<string name=\"app_name\">.*</string>|<string name=\"app_name\">$TITLE</string>|" ".build/$APP/app/src/main/res/values/strings.xml"
-          # move package dir
+          # move package dir (delete ONLY the old factory file)
           PKGDIR=$(echo "$PKG" | tr . /)
           mkdir -p ".build/$APP/app/src/main/java/$PKGDIR"
           sed "s/package com.turnapp.factory/package $PKG/" ".build/$APP/app/src/main/java/com/turnapp/factory/MainActivity.kt" > ".build/$APP/app/src/main/java/$PKGDIR/MainActivity.kt"
-          # Delete ONLY the old factory file (new dir may live under com/turnapp too)
           rm ".build/$APP/app/src/main/java/com/turnapp/factory/MainActivity.kt"
           rmdir ".build/$APP/app/src/main/java/com/turnapp/factory" 2>/dev/null || true
 
