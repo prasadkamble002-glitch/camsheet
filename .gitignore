@@ -1,0 +1,10 @@
+# Ignore everything not needed for the cloud build
+android-sdk/
+.build/
+out/
+graphify-out/
+.opencode/
+*.log
+.cache/
+__pycache__/
+.DS_Store

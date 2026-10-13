@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Offline apps need no internet. File picker uses Storage Access Framework (no permission needed). -->
+    <!-- Keep READ_MEDIA_* out: ACTION_OPEN_DOCUMENT / ACTION_CREATE_DOCUMENT grant per-file access. -->
+
+    <!-- APP_LABEL replaced by Build-APK.ps1 -->
+    <application
+        android:label="TurnApp"
+        android:theme="@style/Theme.TurnApp"
+        android:allowBackup="true"
+        android:supportsRtl="true">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:configChanges="orientation|screenSize|keyboardHidden">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

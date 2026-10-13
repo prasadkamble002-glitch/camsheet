@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CNC Renumber — TurnApp</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, Roboto, Arial, sans-serif; margin: 0; background: #14171d; color: #e8eaf0; }
+  header { padding: 16px; border-left: 6px solid #ff8c1a; margin: 14px 14px 0; background: #1b1f27; border-radius: 10px; }
+  header h1 { margin: 0; font-size: 20px; }
+  header p { margin: 4px 0 0; color: #9aa3b5; font-size: 12px; letter-spacing: 1px; }
+  main { padding: 14px; max-width: 760px; margin: 0 auto; padding-bottom: 40px; }
+  .card { background: #1b1f27; border-radius: 10px; padding: 14px; margin-bottom: 12px; }
+  label { display: block; font-size: 13px; color: #9aa3b5; margin: 10px 0 4px; }
+  input, button, select { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #333b49; font-size: 16px; }
+  input, select { background: #10131a; color: #fff; }
+  button { background: #ff8c1a; color: #111; font-weight: 800; border: none; margin-top: 12px; }
+  button.ghost { background: #262d3a; color: #fff; font-weight: 600; }
+  button:disabled { opacity: .45; }
+  .row { display: flex; gap: 8px; } .row > div { flex: 1; }
+  pre { background: #0d1016; padding: 10px; border-radius: 8px; overflow: auto; max-height: 280px; font-size: 12px; white-space: pre-wrap; word-break: break-all; }
+  .fileitem { background: #10131a; border: 1px solid #2a3140; border-radius: 8px; padding: 10px; margin-top: 8px; }
+  .fileitem b { font-size: 14px; }
+  .fileitem small { color: #9aa3b5; display: block; margin: 2px 0 6px; }
+  .fileitem button { width: auto; padding: 8px 14px; font-size: 14px; margin-top: 6px; }
+  .pill { display: inline-block; background: #0d3b1e; color: #7dffa8; border-radius: 20px; padding: 2px 10px; font-size: 12px; margin-left: 6px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>CNC Program Renumber</h1>
+  <p>VERSION 1.0 • ANDROID • OFFLINE — ported from renumber.py</p>
+</header>
+<main>
+  <div class="card">
+    <label>1. Pick G-code file(s) (.ptp .mpf .nc .cnc .txt .tap .min .prg)</label>
+    <input id="files" type="file" multiple accept=".ptp,.mpf,.nc,.cnc,.txt,.tap,.min,.prg,.PTP,.MPF">
+    <div class="row">
+      <div><label>Start</label><input id="start" type="number" value="1" min="0"></div>
+      <div><label>Step</label><input id="inc" type="number" value="1" min="1"></div>
+      <div><label>Digits (width)</label><input id="width" type="number" value="1" min="1" max="8"></div>
+    </div>
+    <button id="go">Renumber Now</button>
+  </div>
+
+  <div class="card">
+    <label>Status</label>
+    <pre id="status">Ready. Pick file(s), set Start/Step/Digits, tap Renumber. Works offline.</pre>
+  </div>
+
+  <div class="card">
+    <label>Preview (first file)</label>
+    <pre id="prev">No file loaded yet.</pre>
+  </div>
+
+  <div class="card">
+    <label>Results — tap Download per file</label>
+    <div id="results"><small style="color:#9aa3b5">Nothing yet.</small></div>
+  </div>
+
+  <div class="card">
+    <label>How to use on phone</label>
+    <pre>1. Tap file box → pick .ptp/.MPF from Downloads.
+2. Renumber Now → each N-code line gets new number.
+3. Download each file → lands in Downloads folder.
+Only N-numbers change — all other text kept byte-for-byte.</pre>
+  </div>
+</main>
+
+<script>
+"use strict";
+// Exact port of renumber.py :: renumber_text()
+// Python: N_CODE_RE = re.compile(r"^(\s*N)(\d+)(.*)")
+// Only leading N-codes change; line endings preserved.
+function renumberText(text, start, increment, width) {
+  var re = /^(\s*N)(\d+)(.*)$/;
+  // split keeping endings: match lines with endings
+  var parts = text.match(/[^\r\n]*(?:\r\n|\n|\r|$)/g) || [];
+  // match() on empty string returns [""]; drop phantom trailing empty
+  if (parts.length && parts[parts.length-1] === "") parts.pop();
+  var out = [], current = start, changed = 0;
+  for (var i = 0; i < parts.length; i++) {
+    var line = parts[i], content = line, ending = "";
+    if (line.slice(-2) === "\r\n") { content = line.slice(0, -2); ending = "\r\n"; }
+    else if (line.slice(-1) === "\n" || line.slice(-1) === "\r") { content = line.slice(0, -1); ending = line.slice(-1); }
+    var m = re.exec(content);
+    if (m) {
+      var digits = String(current);
+      while (digits.length < width) digits = "0" + digits;
+      out.push(m[1] + digits + m[3] + ending);
+      current += increment; changed++;
+    } else {
+      out.push(line);
+    }
+  }
+  return { text: out.join(""), changed: changed };
+}
+
+function downloadText(filename, text) {
+  var blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement("a");
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  setTimeout(function(){ URL.revokeObjectURL(url); a.remove(); }, 1500);
+}
+
+var loaded = []; // {name, text}
+var $ = function(id){ return document.getElementById(id); };
+
+$("files").addEventListener("change", function(e){
+  loaded = [];
+  var files = Array.prototype.slice.call(e.target.files || []);
+  if (!files.length) return;
+  var pending = files.length;
+  $("status").textContent = "Reading " + files.length + " file(s)…";
+  files.forEach(function(f){
+    var r = new FileReader();
+    r.onload = function(){
+      loaded.push({ name: f.name, text: String(r.result || "") });
+      if (--pending === 0) {
+        $("status").textContent = "Loaded " + loaded.length + " file(s). Tap Renumber Now.";
+        $("prev").textContent = loaded[0].text.slice(0, 4000) || "(empty file)";
+      }
+    };
+    r.onerror = function(){ if (--pending === 0) $("status").textContent = "Some files failed to read."; };
+    r.readAsText(f);
+  });
+});
+
+$("go").addEventListener("click", function(){
+  if (!loaded.length) { $("status").textContent = "Pick at least one file first."; return; }
+  var start = Math.max(0, parseInt($("start").value || "1", 10));
+  var inc = Math.max(1, parseInt($("inc").value || "1", 10));
+  var width = Math.min(8, Math.max(1, parseInt($("width").value || "1", 10)));
+  var box = $("results"); box.innerHTML = "";
+  var total = 0;
+  loaded.forEach(function(f){
+    var r = renumberText(f.text, start, inc, width);
+    total += r.changed;
+    f.out = r.text; f.changed = r.changed;
+    var dot = f.name.lastIndexOf(".");
+    var outName = (dot > 0 ? f.name.slice(0, dot) + "_renumbered" + f.name.slice(dot) : f.name + "_renumbered");
+    f.outName = outName;
+    var div = document.createElement("div");
+    div.className = "fileitem";
+    div.innerHTML = "";
+    var b = document.createElement("b"); b.textContent = f.name;
+    var pill = document.createElement("span"); pill.className = "pill"; pill.textContent = r.changed + " N-codes";
+    var sm = document.createElement("small"); sm.textContent = "→ " + outName;
+    var btn = document.createElement("button"); btn.textContent = "Download " + outName;
+    btn.addEventListener("click", function(){ downloadText(f.outName, f.out); });
+    div.appendChild(b); div.appendChild(pill); div.appendChild(sm); div.appendChild(btn);
+    box.appendChild(div);
+  });
+  $("status").textContent = "Done. " + total + " N-code(s) renumbered across " + loaded.length + " file(s) (start=" + start + ", step=" + inc + ", digits=" + width + ").";
+  if (loaded[0] && loaded[0].out != null) $("prev").textContent = loaded[0].out.slice(0, 4000);
+});
+
+// Self-test on load (mirrors Python behavior). Visible in console; status shows OK.
+(function selfTest(){
+  try {
+    var t = "N10 G01 X1\nG02 X2\n  N20 M30\n%\n";
+    var r = renumberText(t, 1, 1, 1);
+    console.assert(r.changed === 2, "expected 2 changes");
+    console.assert(r.text.indexOf("N1 ") >= 0 || r.text.indexOf("N1") === 0, "renumber mismatch");
+    var t2 = "N0010 X1\r\nN0020 X2\r\n";
+    var r2 = renumberText(t2, 10, 5, 4);
+    console.assert(r2.text === "N0010 X1\r\nN0015 X2\r\n", "CRLF/width mismatch: " + JSON.stringify(r2.text));
+  } catch (e) { console.warn("self-test failed", e); }
+})();
+</script>
+</body>
+</html>

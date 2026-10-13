@@ -1,0 +1,21 @@
+{
+  "active": "camsheet",
+  "apps": {
+    "renumber": {
+      "title": "CNC Renumber",
+      "package": "com.turnapp.renumber",
+      "versionCode": 1,
+      "versionName": "1.0",
+      "src": "apps/renumber/index.html",
+      "portedFrom": "D:\\CAD Automation\\RENUMBER\\RENUMBER v1\\renumber.py :: renumber_text()"
+    },
+    "camsheet": {
+      "title": "CAMSheet",
+      "package": "com.turnapp.camsheet",
+      "versionCode": 6,
+      "versionName": "1.5",
+      "src": "apps/camsheet/index.html",
+      "portedFrom": "D:\\Research for projects\\CAMSheet-v4 :: pipeline + rules + program_validator + time_utils + word_generator policy. Phone does real .docx (offline), PDF/image drawings, NC program check, column toggles. .xlsx still needs PC."
+    }
+  }
+}

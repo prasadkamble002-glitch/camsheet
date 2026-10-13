@@ -1,0 +1,1437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CAMSheet — TurnApp</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, Roboto, Arial, sans-serif; margin: 0; background: #14171d; color: #e8eaf0; }
+  header { padding: 16px; border-left: 6px solid #2f81f7; margin: 14px 14px 0; background: #1b1f27; border-radius: 10px; }
+  header h1 { margin: 0; font-size: 20px; }
+  header p { margin: 4px 0 0; color: #9aa3b5; font-size: 12px; letter-spacing: 1px; }
+  main { padding: 14px; max-width: 860px; margin: 0 auto; padding-bottom: 48px; }
+  .card { background: #1b1f27; border-radius: 10px; padding: 14px; margin-bottom: 12px; }
+  .card h2 { margin: 0 0 6px; font-size: 15px; }
+  label { display: block; font-size: 13px; color: #9aa3b5; margin: 10px 0 4px; }
+  input, button, select, textarea { width: 100%; padding: 11px; border-radius: 8px; border: 1px solid #333b49; font-size: 15px; }
+  input, select, textarea { background: #10131a; color: #fff; }
+  textarea { font-family: ui-monospace, monospace; font-size: 13px; }
+  button { background: #2f81f7; color: #fff; font-weight: 700; border: none; margin-top: 10px; }
+  button.ghost { background: #262d3a; font-weight: 600; }
+  button.warn { background: #7a2e2e; }
+  button:disabled { opacity: .45; }
+  .row { display: flex; gap: 8px; } .row > div { flex: 1; }
+  pre { background: #0d1016; padding: 10px; border-radius: 8px; overflow: auto; max-height: 220px; font-size: 12px; white-space: pre-wrap; word-break: break-all; }
+  details { margin-top: 10px; border: 1px solid #2a3140; border-radius: 8px; padding: 8px 10px; }
+  details summary { cursor: pointer; font-weight: 700; font-size: 14px; }
+  table.mini { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+  table.mini td, table.mini th { border: 1px solid #2a3140; padding: 6px; }
+  table.mini input { padding: 6px; font-size: 13px; }
+  .op { background: #10131a; border: 1px solid #2a3140; border-radius: 8px; padding: 8px; margin-top: 8px; font-size: 13px; }
+  .op.disabled { opacity: .5; }
+  .op .t { font-weight: 700; font-size: 14px; }
+  .op .m { color: #9aa3b5; font-size: 12px; margin-top: 2px; }
+  .op .acts { display: flex; gap: 6px; margin-top: 6px; }
+  .op .acts button { width: auto; padding: 6px 10px; font-size: 12px; margin: 0; }
+  .op.note { border-left: 4px solid #e3b341; }
+  .op.section { border-left: 4px solid #2f81f7; background: #18202e; }
+  .pill { display: inline-block; background: #0d3b1e; color: #7dffa8; border-radius: 20px; padding: 1px 9px; font-size: 11px; margin-left: 6px; }
+  .pill.off { background: #3b1a1a; color: #ff9d9d; }
+  .fileitem { background: #10131a; border: 1px solid #2a3140; border-radius: 8px; padding: 8px 10px; margin-top: 6px; display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; }
+  .fileitem button { width: auto; padding: 6px 10px; font-size: 12px; margin: 0; }
+  .hint { font-size: 12px; color: #9aa3b5; margin-top: 6px; }
+  /* ---- printable sheet ---- */
+  #sheet { display: none; }
+  @media print {
+    body { background: #fff; color: #000; }
+    body > *:not(#sheet) { display: none !important; }
+    #sheet { display: block !important; color: #000; }
+    #sheet h1 { font-size: 18pt; color: #1F4E79; margin: 0 0 8px; }
+    #sheet table { width: 100%; border-collapse: collapse; font-size: 9pt; }
+    #sheet th, #sheet td { border: 1px solid #444; padding: 3px 5px; text-align: left; }
+    #sheet th { background: #1F4E79; color: #fff; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>CAMSheet</h1>
+  <p>VERSION 1.5 • ANDROID • OFFLINE — ported from CAMSheet-v4 pipeline</p>
+</header>
+<main>
+  <div class="card">
+    <h2>1. NX export + project</h2>
+    <label>Pick Siemens NX Operation Navigator HTML export</label>
+    <input id="nxfile" type="file" accept=".html,.htm,.HTML,.HTM">
+    <div class="row">
+      <div><label>Part name</label><input id="part" placeholder="e.g. JZ125 CYL HEAD"></div>
+      <div><label>Programmer</label><input id="prog" placeholder="Your name"></div>
+    </div>
+    <label>NC program folder (text only, for the sheet)</label>
+    <input id="ncfolder" placeholder="e.g. \\server\nc\JZ125">
+    <label>NX part file path (text only, printed on the sheet like PC)</label>
+    <input id="partfile" placeholder="e.g. D:\NX\parts\JZ125_CYL_HEAD.prt">
+    <label>Setup drawing (photo / image / PDF drawing like PC)</label>
+    <input id="drawing" type="file" accept="image/*,.pdf,application/pdf">
+    <div class="row" id="pdfPageRow" style="display:none">
+      <div><label>PDF page</label><input id="pdfPage" type="number" value="1" min="1"></div>
+      <div><label>&nbsp;</label><button id="pdfRender" class="ghost" style="margin-top:0">Render this page</button></div>
+    </div>
+    <img id="drawingPrev" alt="" style="display:none;width:100%;border-radius:8px;margin-top:8px;border:1px solid #2a3140">
+    <div class="hint" id="drawingHint"></div>
+    <div class="hint">Phone version reads the same NX HTML as your PC app. Drawing: images pick directly; PDF drawings render inside the installed app (page selector appears).</div>
+  </div>
+
+  <div class="card">
+    <h2>2. Status</h2>
+    <pre id="status">Ready. Pick an NX HTML export to build the process sheet. Works offline.</pre>
+  </div>
+
+  <div class="card">
+    <h2>3. Company rules (same as PC)</h2>
+    <details open>
+      <summary>Description map — NX type to shop-floor word</summary>
+      <table class="mini" id="descTable"></table>
+      <button id="descReset" class="ghost">Reset to defaults</button>
+    </details>
+    <details>
+      <summary>Tool length rule — diameter ranges (mm)</summary>
+      <table class="mini" id="toolTable"></table>
+      <div class="row">
+        <div><label>Min dia</label><input id="trMin" type="number" step="0.01" value="0"></div>
+        <div><label>Max dia</label><input id="trMax" type="number" step="0.01" value="5.99"></div>
+        <div><label>Add mm</label><input id="trAdd" type="number" step="0.5" value="2"></div>
+      </div>
+      <button id="trAddBtn" class="ghost">Add range</button>
+      <button id="trReset" class="ghost">Reset to defaults (&ge;6&rarr;+4, &lt;6&rarr;+2)</button>
+      <div class="hint">First matching range wins. Length = ceil(shortest + add). No match = NX value kept.</div>
+    </details>
+  </div>
+
+  <div class="card">
+    <h2>4. Operations <span id="cnt"></span></h2>
+    <label>Search</label>
+    <input id="q" placeholder="Filter by name, tool, description...">
+    <div id="ops"></div>
+    <div class="row">
+      <div><button id="addNote" class="ghost">+ Note row</button></div>
+      <div><button id="addSection" class="ghost">+ Section row</button></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>5. NC program check (same as PC)</h2>
+    <label>Pick posted program files (.ptp / .MPF — select many at once, repeat to add more)</label>
+    <input id="progfiles" type="file" multiple accept=".ptp,.mpf,.nc,.PTP,.MPF">
+    <label>…or pick ONE .zip containing all program files (easiest)</label>
+    <input id="progzip" type="file" accept=".zip,.ZIP,application/zip">
+    <div class="hint">If your file manager won't select the zip above, use this backup picker (shows all files):</div>
+    <input id="progzipAny" type="file" accept="*/*">
+    <div class="hint" id="zipStage"></div>
+    <div id="progList"></div>
+    <div class="row">
+      <div><button id="btnCompare">Compare programs with rows</button></div>
+      <div><button id="btnProgClear" class="ghost">Clear files</button></div>
+    </div>
+    <div class="hint">Matching: file base name = operation name (exact first, else one contains the other). Compares cutter dia, corner radius, tool length, operation type, stock, time. Empty values count as match — same rule as PC.</div>
+  </div>
+
+  <div class="card">
+    <h2>6. Export (phone)</h2>
+    <details open>
+      <summary>Columns in export (same choices as PC View/Output)</summary>
+      <div id="colToggles" style="display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;margin-top:8px;font-size:14px"></div>
+      <label style="margin-top:8px"><input id="nxSrcRow" type="checkbox" style="width:auto"> Show NX source file row</label>
+    </details>
+    <button id="btnDocx">Download Word (.docx)</button>
+    <button id="btnPrint" class="ghost">Print / Save PDF sheet</button>
+    <button id="btnHtml" class="ghost">Download sheet (.html)</button>
+    <button id="btnCsv" class="ghost">Download table (.csv)</button>
+    <div class="row">
+      <div><button id="btnSave" class="ghost">Save project (.json)</button></div>
+      <div><button id="btnLoadPick" class="ghost">Load project (.json)</button></div>
+    </div>
+    <input id="projfile" type="file" accept=".json,application/json" style="display:none">
+    <div class="hint">Word file opens in MS Word / WPS / Google Docs with title, metadata, drawing photo, process table and program-check results. For .xlsx or PDF-drawing embedding, open the saved project on your PC CAMSheet.</div>
+  </div>
+</main>
+
+<!-- printable sheet -->
+<div id="sheet"></div>
+
+<script>
+"use strict";
+/* ============ CAMSheet-v4 logic port (pipeline + rules + builder) ============ */
+/* Mirrors: html_reader.py, html_interpreter.py, description_rules.py,
+   tool_rules.py, description/tool transformers, document_builder.py,
+   process_row.format_stock. Only leading behavior kept identical. */
+
+var DEFAULT_DESC = {
+  "CAVITY_MILL": "Roughing",
+  "CORNER_ROUGH": "Rest Roughing",
+  "REST_MILLING": "Rest Roughing",
+  "ZLEVEL_PROFILE": "Profile",
+  "ZLEVEL_CORNER": "Rest",
+  "FIXED_CONTOUR": "Z-Cleanup",
+  "CONTOUR_AREA": "Sinking",
+  "FLOWLINE": "Flowline"
+};
+function defaultToolRule() {
+  return [
+    { min_diameter: 0, max_diameter: 5.99, add_length: 2 },
+    { min_diameter: 6, max_diameter: 9999, add_length: 4 }
+  ];
+}
+var customDesc = Object.assign({}, DEFAULT_DESC);
+var toolRule = defaultToolRule();
+var rows = [];          // editable document rows
+var nxHeaders = [];
+var srcName = "";
+var drawingDataUrl = "", drawingName = "", drawingBaseName = "", drawingW = 0, drawingH = 0;
+var drawingPdfB64 = "", drawingPdfPages = 0;
+var progFiles = [];     // {name, text, data} posted .ptp/.MPF files
+
+function getDescription(nxType) {
+  if (nxType in customDesc) return customDesc[nxType];
+  return nxType;
+}
+function extractDiameter(toolName) {
+  var m = /D(\d+(\.\d+)?)/.exec(toolName || "");
+  return m ? parseFloat(m[1]) : null;
+}
+function stripToolLength(toolName) {
+  if (!toolName) return toolName;
+  return toolName.replace(/[Ll]\d+(\.\d+)?\s*$/, "").trim();
+}
+function calculateToolLength(shortest, toolName) {
+  var d = extractDiameter(toolName);
+  if (d === null) return shortest;
+  var s = parseFloat(shortest);
+  if (!isFinite(s)) return shortest;
+  for (var i = 0; i < toolRule.length; i++) {
+    var e = toolRule[i];
+    if (e.min_diameter <= d && d <= e.max_diameter) return String(Math.ceil(s + e.add_length));
+  }
+  return shortest;
+}
+function formatStock(v) {
+  if (!v) return v;
+  var n = parseFloat(v);
+  return isFinite(n) ? n.toFixed(2) : v;
+}
+/* Decode an NX tool name (D20R2L100) into labeled parts for readable display. */
+function toolBits(tool) {
+  var m = /D([\d.]+)(?:\s*R([\d.]+))?(?:\s*L([\d.]+))?/i.exec(String(tool || ""));
+  return m ? { dia: m[1], corner: m[2] || "", len: m[3] || "" } : null;
+}
+function toolReadableLine(r) {
+  var b = toolBits(r.tool_name);
+  if (!b) return "Tool " + (r.tool_name || "-") + " · production length " + (r.tool_length || "-");
+  var parts = ["Cutter Ø" + b.dia + " mm"];
+  if (b.corner) parts.push("corner R" + b.corner);
+  if (b.len) parts.push("NX length L" + b.len);
+  if (r.nx_tool_length) parts.push("NX shortest " + r.nx_tool_length);
+  parts.push("→ production " + (r.tool_length || "-"));
+  return parts.join(" · ");
+}
+
+/* ---- html_reader.py port: first <table>, headers from first <tr>,
+        img title/alt fallback (Gouge Check), pad short rows ---- */
+function parseNxHtml(text) {
+  var doc = new DOMParser().parseFromString(text, "text/html");
+  var table = doc.querySelector("table");
+  if (!table) throw new Error("No HTML table found — is this an NX Operation Navigator export?");
+  var trs = table.querySelectorAll("tr");
+  if (!trs.length) throw new Error("Empty table.");
+  var headers = Array.prototype.map.call(trs[0].querySelectorAll("th,td"), function(c){
+    return (c.textContent || "").trim();
+  });
+  var out = [];
+  for (var i = 1; i < trs.length; i++) {
+    var tds = trs[i].querySelectorAll("td");
+    if (!tds.length) continue;
+    var vals = Array.prototype.map.call(tds, function(cell){
+      var t = (cell.textContent || "").replace(/\s+/g, " ").trim();
+      if (t) return t;
+      var imgs = cell.querySelectorAll("img"), titles = [];
+      for (var k = 0; k < imgs.length; k++) {
+        var ti = (imgs[k].getAttribute("title") || imgs[k].getAttribute("alt") || "").trim();
+        if (ti) titles.push(ti);
+      }
+      return titles.join("; ");
+    });
+    while (vals.length < headers.length) vals.push("");
+    var d = {};
+    for (var h = 0; h < headers.length; h++) d[headers[h]] = vals[h];
+    out.push(d);
+  }
+  return { headers: headers, rows: out };
+}
+
+/* ---- html_interpreter.py port: skip pre-MCS rows; MCS_MILL / WORKPIECE / op ---- */
+function interpret(rawRows) {
+  var setups = [], cur = null, geo = null, seq = 1, found = false;
+  rawRows.forEach(function(row, idx){
+    var desc = (row["Description"] || "").trim();
+    if (!cur && desc !== "MCS_MILL") return;
+    if (desc === "MCS_MILL") {
+      cur = { name: row["Name"] || "", geos: [] };
+      setups.push(cur); geo = null; found = true; return;
+    }
+    if (desc === "WORKPIECE") {
+      if (!cur) throw new Error("WORKPIECE before MCS_MILL.");
+      geo = { name: row["Name"] || "", ops: [] };
+      cur.geos.push(geo); return;
+    }
+    if (!geo) throw new Error("Operation before WORKPIECE.");
+    geo.ops.push({
+      sequence: seq++, source_order: idx,
+      name: row["Name"] || "", tool: row["Tool"] || "",
+      shortest: row["Shortest Tool Length"] || "",
+      time: row["Time"] || "", stock: row["Stock"] || "",
+      nx_desc: row["Description"] || "",
+      doc: row["Depth of Cut"] || "", feed: row["Feed"] || "",
+      speed: row["Speed"] || "", gouge: row["Gouge Check"] || "",
+      setup: cur.name, geometry: geo.name
+    });
+  });
+  if (!found) throw new Error("No MCS_MILL machine setup found in this HTML export.");
+  return setups;
+}
+
+/* ---- transformers + document_builder.py port ---- */
+function buildDocument(setups) {
+  var doc = [];
+  setups.forEach(function(s){
+    s.geos.forEach(function(g){
+      g.ops.forEach(function(op){
+        var dispLen = calculateToolLength(op.shortest, op.tool);
+        doc.push({
+          enabled: !(op.name.toUpperCase().indexOf("DUMMY") === 0),
+          row_type: "operation",
+          row_name: op.name,
+          tool_name: op.tool,            // full NX name on screen (PC policy)
+          tool_length: dispLen,
+          stock: op.stock, time: op.time,
+          description: getDescription(op.nx_desc),
+          area: "",
+          nx_tool_length: op.shortest, nx_description: op.nx_desc,
+          feed: op.feed, speed: op.speed, depth_of_cut: op.doc,
+          gouge_check: op.gouge, setup: s.name, geometry: g.name
+        });
+      });
+    });
+  });
+  return doc;
+}
+
+/* ============ program_validator.py + program_type_rules.py + time_utils.py port ============ */
+/* Compares posted .ptp/.MPF headers with process rows, exactly like the PC app:
+   cutter dia / corner radius / tool length / operation type / stock / time.
+   Empty values count as match (informational). Times equal within 0.1 min. */
+var DEFAULT_PROGRAM_TYPE_MAP = {
+  "ZLEVEL_PROFILE": ["Z-Level Milling"],
+  "ZLEVEL_CORNER": ["Z-Level Milling"],
+  "CAVITY_MILL": ["Cavity Milling"],
+  "CORNER_ROUGH": ["Z-Level Milling"],
+  "REST_MILLING": ["Z-Level Milling"],
+  "FIXED_CONTOUR": ["Fixed-axis Surface Contouring"],
+  "CONTOUR_AREA": ["Fixed-axis Surface Contouring"],
+  "FLOWLINE": ["Flowline"],
+  "DRILLING": ["Drilling"]
+};
+var FIELD_LABELS = {
+  "cutter_dia": "Cutter Dia", "corner_radius": "Corner Radius",
+  "tool_length": "Tool Length", "holder_dia": "Holder Dia",
+  "holder_length": "Holder Length", "operation_type": "Operation Type",
+  "part_stock": "Part Stock", "machining_time": "Machining Time"
+};
+function expectedProgramTypes(nxType, customMap) {
+  var lookup = customMap || DEFAULT_PROGRAM_TYPE_MAP;
+  var value = (nxType in lookup) ? lookup[nxType] : (DEFAULT_PROGRAM_TYPE_MAP[nxType] || []);
+  if (typeof value === "string") value = [value];
+  var out = {};
+  value.forEach(function(v){ v = String(v).trim().toLowerCase(); if (v) out[v] = 1; });
+  return out;
+}
+function isProgramTypeMatch(nxType, progType, customMap) {
+  var exp = expectedProgramTypes(nxType, customMap);
+  if (!Object.keys(exp).length) return false;
+  return !!exp[String(progType || "").trim().toLowerCase()];
+}
+function parseProgramFile(text, fileName) {
+  var d = { file_name: fileName || "", operation_type: "", cutter_dia: "",
+    corner_radius: "", tool_length: "", holder_dia: "", holder_length: "",
+    part_stock: "", machining_time: "" };
+  var lines = String(text || "").split(/\r?\n/);
+  lines.forEach(function(line){
+    var m = /OPERATION TYPE :-\s*([^)]*)/.exec(line);
+    if (m) { d.operation_type = m[1].trim(); return; }
+    m = /CUTTER DIA:-\s*([\d.]+)\s*,\s*CORNER RADIUS:-\s*([\d.]+)\s*,\s*TOOL LENGTH:-\s*([\d.]+)/.exec(line);
+    if (m) { d.cutter_dia = m[1]; d.corner_radius = m[2]; d.tool_length = m[3]; return; }
+    m = /HOLDER DIA:-\s*([\d.]+)\s*,\s*HOLDER LENGTH:-\s*([\d.]+)/.exec(line);
+    if (m) { d.holder_dia = m[1]; d.holder_length = m[2]; return; }
+    m = /Part Stock:-\s*([\d.]+)/.exec(line);
+    if (m) { d.part_stock = m[1]; return; }
+  });
+  var mt = /\(Machining Time:\s*([\d.]+)\s*min\)/.exec(String(text || ""));
+  if (mt) d.machining_time = mt[1];
+  return d;
+}
+function parseToolDRL(toolName) {
+  var m = /D([\d.]+)\s*R([\d.]+)\s*L([\d.]+)/i.exec(String(toolName || ""));
+  return m ? { dia: m[1], corner: m[2], length: m[3] } : {};
+}
+function pvFloat(v) {
+  if (v === null || v === undefined) return null;
+  var n = parseFloat(String(v).trim());
+  return isFinite(n) ? n : null;
+}
+function pvEqual(a, b) {
+  var x = pvFloat(a), y = pvFloat(b);
+  if (x === null || y === null) return true;
+  return Math.abs(x - y) < 1e-6;
+}
+function pvTimeToMin(v) {
+  var t = String(v == null ? "" : v).trim();
+  if (!t) return null;
+  var f = parseFloat(t);
+  if (isFinite(f) && /^[\d.\s]+$/.test(t)) return f;
+  var m = /^(\d+):(\d+):(\d+)/.exec(t);
+  if (m) return (+m[1]) * 60 + (+m[2]) + (+m[3]) / 60;
+  return null;
+}
+function pvTimesEqual(a, b) {
+  var x = pvTimeToMin(a), y = pvTimeToMin(b);
+  if (x === null || y === null) return true;
+  return Math.abs(x - y) < 0.1;
+}
+function progStem(name) {
+  // base file name without extension, lower-case (zip entries may be in folders)
+  return String(name || "").replace(/\\/g, "/").split("/").pop().replace(/\.[^.]+$/, "").toLowerCase();
+}
+function resolveProgFile(rowName) {
+  var wanted = String(rowName || "").trim().toLowerCase();
+  if (!wanted || !progFiles.length) return null;
+  var i, stem;
+  for (i = 0; i < progFiles.length; i++) {
+    if (progStem(progFiles[i].name) === wanted) return progFiles[i];
+  }
+  for (i = 0; i < progFiles.length; i++) {
+    stem = progStem(progFiles[i].name);
+    if (wanted.indexOf(stem) >= 0 || stem.indexOf(wanted) >= 0) return progFiles[i];
+  }
+  return null;
+}
+function checkRowProgram(r) {
+  var res = { status: "", program_file: "", mismatch_fields: [] };
+  var f = resolveProgFile(r.row_name);
+  if (!f) { res.status = "not_found"; return res; }
+  if (!f.data) f.data = parseProgramFile(f.text, f.name);
+  var d = f.data;
+  res.program_file = f.name.replace(/\.[^.]+$/, "");
+  var tp = parseToolDRL(r.tool_name);
+  var bad = [];
+  if (!pvEqual(tp.dia, d.cutter_dia)) bad.push("cutter_dia");
+  if (!pvEqual(tp.corner, d.corner_radius)) bad.push("corner_radius");
+  if (!pvEqual(tp.length, d.tool_length)) bad.push("tool_length");
+  if (!(d.operation_type && isProgramTypeMatch(r.nx_description, d.operation_type))) bad.push("operation_type");
+  if (!pvEqual(r.stock, d.part_stock)) bad.push("part_stock");
+  if (!pvTimesEqual(r.time, d.machining_time)) bad.push("machining_time");
+  res.mismatch_fields = bad;
+  res.status = bad.length ? "mismatch" : "match";
+  return res;
+}
+function runProgramCompare() {
+  var nMatch = 0, nMis = 0, nMiss = 0;
+  rows.forEach(function(r){
+    if (r.row_type !== "operation") { r.program_status = ""; r.program_file = ""; r.program_mismatch_fields = []; return; }
+    var c = checkRowProgram(r);
+    r.program_status = c.status; r.program_file = c.program_file; r.program_mismatch_fields = c.mismatch_fields;
+    if (c.status === "match") nMatch++;
+    else if (c.status === "mismatch") nMis++;
+    else nMiss++;
+  });
+  renderOps();
+  renderColToggles();
+  return { match: nMatch, mismatch: nMis, missing: nMiss };
+}
+function formatMismatch(fields) {
+  return (fields || []).map(function(f){ return FIELD_LABELS[f] || f; }).join(", ");
+}
+/* ---- time_utils.py port ---- */
+function parseTimeToSeconds(v) {
+  if (v === null || v === undefined) return 0;
+  var parts = String(v).trim().split(":");
+  var nums = [];
+  for (var i = 0; i < parts.length; i++) {
+    var n = parseInt(parts[i].trim(), 10);
+    if (!isFinite(n) || n < 0) return 0;
+    nums.push(n);
+  }
+  if (nums.length === 4) return nums[0]*86400 + nums[1]*3600 + nums[2]*60 + nums[3];
+  if (nums.length === 3) return nums[0]*3600 + nums[1]*60 + nums[2];
+  if (nums.length === 2) return nums[0]*60 + nums[1];
+  if (nums.length === 1) return nums[0];
+  return 0;
+}
+function formatSecondsToNx(total) {
+  total = Math.max(0, Math.floor(total));
+  var days = Math.floor(total / 86400), rem = total % 86400;
+  var h = Math.floor(rem / 3600); rem %= 3600;
+  var m = Math.floor(rem / 60), s = rem % 60;
+  function p2(x){ return (x < 10 ? "0" : "") + x; }
+  if (days) return days + ":" + p2(h) + ":" + p2(m) + ":" + p2(s);
+  return p2(h) + ":" + p2(m) + ":" + p2(s);
+}
+function totalTimeStr() {
+  var t = 0;
+  rows.forEach(function(r){
+    if (r.row_type !== "operation" || !r.enabled) return;
+    t += parseTimeToSeconds(r.time);
+  });
+  return formatSecondsToNx(t);
+}
+
+/* ============ minimal ZIP reader (pure JS, offline, no libraries) ============ */
+/* Unpacks .zip files picked on the phone (e.g. all posted programs in one
+   file). Supports stored (method 0) and deflated (method 8) entries with
+   CRC32 verification. Data descriptors / spanning / encryption not supported
+   (normal Windows "Send to compressed folder" zips work fine). */
+function zipInflateRaw(data) {
+  var pos = 0, hold = 0, bits = 0;
+  function need(n) {
+    while (bits < n) {
+      if (pos >= data.length) throw new Error("Bad zip data (truncated deflate stream).");
+      hold |= data[pos++] << bits;
+      bits += 8;
+    }
+  }
+  function drop(n) { hold >>>= n; bits -= n; }
+  function get(n) { need(n); var v = hold & ((1 << n) - 1); drop(n); return v; }
+  var LBASE = [3,4,5,6,7,8,9,10,11,13,15,17,19,23,27,31,35,43,51,59,67,83,99,115,131,163,195,227,258];
+  var LEXT = [0,0,0,0,0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,0];
+  var DBASE = [1,2,3,4,5,7,9,13,17,25,33,49,65,97,129,193,257,385,513,769,1025,1537,2049,3073,4097,6145,8193,12289,16385,24577];
+  var DEXT = [0,0,0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,12,13,13];
+  function buildTree(lengths) {
+    // Canonical Huffman tree with LSB-first lookup map (RFC 1951 codes are
+    // packed MSB-first; the stream delivers them LSB-first).
+    var n = lengths.length, maxLen = 0, i;
+    for (i = 0; i < n; i++) if (lengths[i] > maxLen) maxLen = lengths[i];
+    var blCount = [], nextCode = [], code = 0, map = {};
+    for (i = 0; i <= maxLen; i++) blCount[i] = 0;
+    for (i = 0; i < n; i++) blCount[lengths[i]]++;
+    for (i = 1; i <= maxLen; i++) { code = (code + blCount[i - 1]) << 1; nextCode[i] = code; }
+    for (i = 0; i < n; i++) {
+      var len = lengths[i];
+      if (len === 0) continue;
+      var c = nextCode[len]++;
+      var rev = 0;
+      for (var b = 0; b < len; b++) rev |= ((c >>> b) & 1) << (len - 1 - b);
+      (map[len] || (map[len] = {}))[rev] = i;
+    }
+    return { maxLen: maxLen, map: map };
+  }
+  function decode(tree) {
+    var code = 0, len = 0;
+    while (true) {
+      need(1);
+      code |= (hold & 1) << len;
+      hold >>>= 1; bits -= 1; len++;
+      var bucket = tree.map[len];
+      if (bucket !== undefined && bucket[code] !== undefined) return bucket[code];
+      if (len > tree.maxLen + 16) throw new Error("Bad zip data (broken Huffman code).");
+    }
+  }
+  var out = [], outLen = 0;
+  function emitByte(b) { out.push(b); outLen++; }
+  function emitMatch(dist, len) {
+    var from = outLen - dist;
+    if (from < 0) throw new Error("Bad zip data (match before start).");
+    for (var i = 0; i < len; i++) { out.push(out[from + i]); outLen++; }
+  }
+  var fixedLit = null, fixedDist = null;
+  function fixedTrees() {
+    if (!fixedLit) {
+      var ll = [], i;
+      for (i = 0; i < 144; i++) ll.push(8);
+      for (; i < 256; i++) ll.push(9);
+      for (; i < 280; i++) ll.push(7);
+      for (; i < 288; i++) ll.push(8);
+      fixedLit = buildTree(ll);
+      var dd = [];
+      for (i = 0; i < 32; i++) dd.push(5);
+      fixedDist = buildTree(dd);
+    }
+    return [fixedLit, fixedDist];
+  }
+  var CL_ORDER = [16,17,18,0,8,7,9,6,10,5,11,4,12,3,13,2,14,1,15];
+  var fin = false;
+  while (!fin) {
+    fin = !!get(1);
+    var type = get(2);
+    var lit, dist;
+    if (type === 0) {
+      hold = 0; bits = 0;
+      if (pos + 4 > data.length) throw new Error("Bad zip data (truncated stored block).");
+      var len = data[pos] | (data[pos + 1] << 8);
+      var nlen = data[pos + 2] | (data[pos + 3] << 8);
+      pos += 4;
+      if ((len ^ nlen) !== 0xFFFF) throw new Error("Bad zip data (stored block length mismatch).");
+      if (pos + len > data.length) throw new Error("Bad zip data (truncated stored block).");
+      for (var s = 0; s < len; s++) emitByte(data[pos++]);
+      continue;
+    } else if (type === 1) {
+      var fx = fixedTrees();
+      lit = fx[0]; dist = fx[1];
+    } else if (type === 2) {
+      var hlit = get(5) + 257, hdist = get(5) + 1, hclen = get(4) + 4;
+      var clLens = [];
+      for (var c = 0; c < 19; c++) clLens.push(0);
+      for (c = 0; c < hclen; c++) clLens[CL_ORDER[c]] = get(3);
+      var clTree = buildTree(clLens);
+      var all = [], want = hlit + hdist;
+      while (all.length < want) {
+        var sym = decode(clTree);
+        if (sym <= 15) all.push(sym);
+        else if (sym === 16) {
+          if (!all.length) throw new Error("Bad zip data (bad repeat).");
+          var rep = get(2) + 3, prev = all[all.length - 1];
+          for (var r = 0; r < rep; r++) all.push(prev);
+        } else if (sym === 17) {
+          var rz = get(3) + 3;
+          for (var z = 0; z < rz; z++) all.push(0);
+        } else {
+          var rz2 = get(7) + 11;
+          for (var z2 = 0; z2 < rz2; z2++) all.push(0);
+        }
+      }
+      lit = buildTree(all.slice(0, hlit));
+      dist = buildTree(all.slice(hlit, want));
+    } else {
+      throw new Error("Bad zip data (unknown block type).");
+    }
+    while (true) {
+      var sym2 = decode(lit);
+      if (sym2 < 256) emitByte(sym2);
+      else if (sym2 === 256) break;
+      else {
+        var li = sym2 - 257;
+        if (li < 0 || li >= LBASE.length) throw new Error("Bad zip data (bad length code).");
+        var length = LBASE[li] + (LEXT[li] ? get(LEXT[li]) : 0);
+        var dsym = decode(dist);
+        if (dsym < 0 || dsym >= DBASE.length) throw new Error("Bad zip data (bad distance code).");
+        emitMatch(DBASE[dsym] + (DEXT[dsym] ? get(DEXT[dsym]) : 0), length);
+      }
+    }
+  }
+  return new Uint8Array(out);
+}
+function zipReadEntries(bytes) {
+  // -> [{name, data:Uint8Array}] for stored/deflated file entries (dirs skipped)
+  function u16(o){ return bytes[o] | (bytes[o + 1] << 8); }
+  function u32(o){ return (bytes[o] | (bytes[o + 1] << 8) | (bytes[o + 2] << 16) | (bytes[o + 3] << 24)) >>> 0; }
+  if (bytes.length < 22) throw new Error("Not a zip file (too small).");
+  var eocd = -1;
+  var lo = Math.max(0, bytes.length - 22 - 65535);
+  for (var i = bytes.length - 22; i >= lo; i--) {
+    if (u32(i) === 0x06054b50) { eocd = i; break; }
+  }
+  if (eocd < 0) throw new Error("Not a zip file (end record missing).");
+  var count = u16(eocd + 10), cdOff = u32(eocd + 16);
+  var p = cdOff, out = [], seen = 0;
+  var utf8 = (typeof TextDecoder !== "undefined");
+  function decName(raw, isUtf8) {
+    if (isUtf8 && utf8) { try { return new TextDecoder("utf-8").decode(raw); } catch (e) { /* fall through */ } }
+    var s = "";
+    for (var k = 0; k < raw.length; k++) s += String.fromCharCode(raw[k]);
+    return s;
+  }
+  for (var n = 0; n < count; n++) {
+    if (p + 46 > bytes.length || u32(p) !== 0x02014b50) throw new Error("Not a zip file (broken directory).");
+    var method = u16(p + 10), crc = u32(p + 16);
+    var csize = u32(p + 20), usize = u32(p + 24);
+    var nl = u16(p + 28), el = u16(p + 30), cl = u16(p + 32);
+    var lhOff = u32(p + 42), flags = u16(p + 8);
+    var rawName = bytes.slice(p + 46, p + 46 + nl);
+    var name = decName(rawName, (flags & 0x800) !== 0).replace(/\\/g, "/");
+    p += 46 + nl + el + cl;
+    if (name.charAt(name.length - 1) === "/") continue; // directory
+    if (u32(lhOff) !== 0x04034b50) throw new Error("Not a zip file (broken local header).");
+    var lnl = u16(lhOff + 26), lel = u16(lhOff + 28);
+    var dOff = lhOff + 30 + lnl + lel;
+    if (dOff + csize > bytes.length) throw new Error("Zip is truncated: " + name);
+    var comp = bytes.slice(dOff, dOff + csize);
+    var raw;
+    try {
+      if (method === 0) raw = comp;
+      else if (method === 8) raw = zipInflateRaw(comp);
+      else throw new Error("Unsupported zip method in " + name + " (only stored/deflated).");
+    } catch (err) {
+      throw new Error("Could not unpack '" + name + "': " + (err && err.message || err));
+    }
+    if (raw.length !== usize) throw new Error("Size mismatch in " + name);
+    if (crc32(raw) !== crc) throw new Error("CRC failed in " + name + " (file is damaged).");
+    if (out.length >= 2000) throw new Error("Zip has too many files (limit 2000).");
+    if (usize > 200 * 1024 * 1024) throw new Error("File too big in zip: " + name);
+    out.push({ name: name, data: raw });
+    seen++;
+    void seen;
+  }
+  return out;
+}
+
+/* ============ minimal .docx writer (pure JS, offline, no libraries) ============ */
+/* Builds a valid Word file with STORE-method ZIP entries:
+   [Content_Types].xml, _rels/.rels, word/document.xml (+ image parts).
+   Mirrors word_generator.py policy: title, metadata, drawing, NC location,
+   total time, process table (enabled rows, stripped tools, 2-decimal stock). */
+var CRC_TABLE = (function(){
+  var t = [], c;
+  for (var n = 0; n < 256; n++) {
+    c = n;
+    for (var k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+    t[n] = c >>> 0;
+  }
+  return t;
+})();
+function crc32(bytes) {
+  var c = 0xFFFFFFFF;
+  for (var i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+function strBytes(s) { return new TextEncoder().encode(s); }
+function b64ToBytes(b64) {
+  var bin = atob(b64), out = new Uint8Array(bin.length);
+  for (var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+function buildStoredZip(files) {
+  // files: [{name, data:Uint8Array}] -> Blob (valid .docx/.zip, STORE method)
+  var chunks = [], central = [], offset = 0;
+  function u16(v, arr){ arr.push(v & 0xFF, (v >>> 8) & 0xFF); }
+  function u32(v, arr){ arr.push(v & 0xFF, (v >>> 8) & 0xFF, (v >>> 16) & 0xFF, (v >>> 24) & 0xFF); }
+  files.forEach(function(f){
+    var nameB = strBytes(f.name), crc = crc32(f.data);
+    var lh = [];
+    u32(0x04034b50, lh); u16(20, lh); u16(0x0800, lh); u16(0, lh);
+    u16(0, lh); u16(0, lh); u32(crc, lh); u32(f.data.length, lh); u32(f.data.length, lh);
+    u16(nameB.length, lh); u16(0, lh);
+    var lhB = new Uint8Array(lh);
+    chunks.push(lhB, nameB, f.data);
+    var c = [];
+    u32(0x02014b50, c); u16(20, c); u16(20, c); u16(0x0800, c); u16(0, c);
+    u16(0, c); u16(0, c); u32(crc, c); u32(f.data.length, c); u32(f.data.length, c);
+    u16(nameB.length, c); u16(0, c); u16(0, c); u16(0, c); u16(0, c); u32(0, c); u32(offset, c);
+    central.push(new Uint8Array(c), nameB);
+    offset += lhB.length + nameB.length + f.data.length;
+  });
+  var csize = 0;
+  central.forEach(function(b){ csize += b.length; });
+  var end = [];
+  u32(0x06054b50, end); u16(0, end); u16(0, end);
+  u16(files.length, end); u16(files.length, end);
+  u32(csize, end); u32(offset, end); u16(0, end);
+  return new Blob(chunks.concat(central, [new Uint8Array(end)]), { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
+}
+function xmlEsc(s) {
+  return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+/* ---- export column model: same columns + PC show_* defaults (word_generator.py) ---- */
+var ALL_COLUMNS = [
+  { key: "No.", attr: null },
+  { key: "Program", attr: "row_name" },
+  { key: "Tool", attr: "tool_name", strip: true },
+  { key: "Length", attr: "tool_length" },
+  { key: "Stock", attr: "stock", isStock: true },
+  { key: "Time", attr: "time" },
+  { key: "Description", attr: "description" },
+  { key: "Area / Location", attr: "area" },
+  { key: "NX Length", attr: "nx_tool_length" },
+  { key: "Feed", attr: "feed" },
+  { key: "Speed", attr: "speed" },
+  { key: "Depth of Cut", attr: "depth_of_cut" },
+  { key: "Gouge Check", attr: "gouge_check" },
+  { key: "NX Description", attr: "nx_description" },
+  { key: "Program Check", attr: null, isProg: true }
+];
+var COL_WIDTHS_MM = { "No.": 15, "Program": 40, "Tool": 30, "Length": 17, "Stock": 17,
+  "Time": 19, "Description": 25, "Area / Location": 30, "NX Length": 20, "Feed": 25,
+  "Speed": 20, "Depth of Cut": 20, "Gouge Check": 20, "NX Description": 35, "Program Check": 35 };
+var CENTER_COLS = { "No.": 1, "Length": 1, "Stock": 1, "Time": 1 };
+function defaultColVis() {
+  return { "No.": false, "Program": true, "Tool": true, "Length": true, "Stock": true,
+    "Time": true, "Description": true, "Area / Location": true, "NX Length": false,
+    "Feed": false, "Speed": false, "Depth of Cut": false, "Gouge Check": false,
+    "NX Description": false, "Program Check": true };
+}
+var colVis = defaultColVis();
+var showNxSourceRow = false;
+function hasProgData() {
+  return rows.some(function(r){ return r.row_type === "operation" && r.program_status; });
+}
+function visibleCols() {
+  var hp = hasProgData();
+  return ALL_COLUMNS.filter(function(c){
+    if (c.isProg && !hp) return false;
+    return !!colVis[c.key];
+  });
+}
+function progCheckText(r) {
+  if (r.program_status === "match") return "Match (" + (r.program_file || "") + ")";
+  if (r.program_status === "mismatch") return "Mismatch: " + formatMismatch(r.program_mismatch_fields);
+  if (r.program_status === "not_found") return "No program file";
+  return "-";
+}
+function colValue(r, col, seq) {
+  if (col.key === "No.") return String(seq);
+  if (col.isProg) return progCheckText(r);
+  var v = r[col.attr];
+  if (col.strip) v = stripToolLength(v);
+  if (col.isStock) v = formatStock(v);
+  return (v == null ? "" : String(v));
+}
+function fmtDocDate(d) {
+  var M = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  function p2(x){ return (x < 10 ? "0" : "") + x; }
+  return p2(d.getDate()) + " " + M[d.getMonth()] + " " + d.getFullYear() + " " + p2(d.getHours()) + ":" + p2(d.getMinutes());
+}
+function mmToTwips(mm){ return Math.round(mm * 56.7); }
+function wCell(text, opts) {
+  opts = opts || {};
+  var shd = opts.shd ? "<w:shd w:fill=\"" + opts.shd + "\" w:val=\"clear\"/>" : "";
+  var b = opts.bold ? "<w:b/>" : "", it = opts.italic ? "<w:i/>" : "";
+  var col = opts.color ? "<w:color w:val=\"" + opts.color + "\"/>" : "";
+  var sz = "<w:sz w:val=\"" + (opts.size || 20) + "\"/>";
+  var grid = opts.gridSpan ? "<w:gridSpan w:val=\"" + opts.gridSpan + "\"/>" : "";
+  var tcW = opts.tcWDxa ? "<w:tcW w:w=\"" + opts.tcWDxa + "\" w:type=\"dxa\"/>" : "<w:tcW w:w=\"0\" w:type=\"auto\"/>";
+  var jc = opts.center ? "<w:jc w:val=\"center\"/>" : "";
+  var vA = "<w:vAlign w:val=\"" + (opts.vAlign || "center") + "\"/>";
+  var ls = opts.ls ? "<w:spacing w:line=\"" + Math.round(opts.ls * 240) + "\" w:lineRule=\"auto\"/>" : "";
+  return "<w:tc><w:tcPr>" + tcW + grid + shd + vA +
+    "</w:tcPr><w:p><w:pPr>" + jc + ls + "</w:pPr><w:r><w:rPr><w:rFonts w:ascii=\"Arial\" w:hAnsi=\"Arial\"/>" +
+    b + it + col + sz + "</w:rPr><w:t xml:space=\"preserve\">" + xmlEsc(text) + "</w:t></w:r></w:p></w:tc>";
+}
+function wCellRich(label, value, opts) {
+  // "Label: value" with bold label — like PC metadata cells
+  opts = opts || {};
+  var tcW = opts.tcWDxa ? "<w:tcW w:w=\"" + opts.tcWDxa + "\" w:type=\"dxa\"/>" : "<w:tcW w:w=\"0\" w:type=\"auto\"/>";
+  var grid = opts.gridSpan ? "<w:gridSpan w:val=\"" + opts.gridSpan + "\"/>" : "";
+  var sz = "<w:sz w:val=\"" + (opts.size || 20) + "\"/>";
+  var ls = opts.ls ? "<w:spacing w:line=\"" + Math.round(opts.ls * 240) + "\" w:lineRule=\"auto\"/>" : "";
+  return "<w:tc><w:tcPr>" + tcW + grid + "<w:vAlign w:val=\"center\"/>" +
+    "</w:tcPr><w:p><w:pPr>" + ls + "</w:pPr>" +
+    "<w:r><w:rPr><w:rFonts w:ascii=\"Arial\" w:hAnsi=\"Arial\"/><w:b/>" + sz + "</w:rPr><w:t xml:space=\"preserve\">" + xmlEsc(label) + "</w:t></w:r>" +
+    "<w:r><w:rPr><w:rFonts w:ascii=\"Arial\" w:hAnsi=\"Arial\"/>" + sz + "</w:rPr><w:t xml:space=\"preserve\">" + xmlEsc(value) + "</w:t></w:r>" +
+    "</w:p></w:tc>";
+}
+function wRow(cellsHtml, heightMm, isHeader) {
+  var trPr = "<w:trPr><w:trHeight w:val=\"" + mmToTwips(heightMm || 9) + "\" w:hRule=\"atLeast\"/>" +
+    (isHeader ? "<w:tblHeader w:val=\"true\"/>" : "") + "</w:trPr>";
+  return "<w:tr>" + trPr + cellsHtml + "</w:tr>";
+}
+function wBordersSingle() {
+  var e = ["w:top","w:left","w:bottom","w:right","w:insideH","w:insideV"], s = "";
+  e.forEach(function(t){ s += "<" + t + " w:val=\"single\" w:sz=\"4\" w:color=\"000000\"/>"; });
+  return "<w:tblBorders>" + s + "</w:tblBorders>";
+}
+function wTable(headers, bodyRows, widthsDxa, opts) {
+  opts = opts || {};
+  var grid = widthsDxa.map(function(w){ return "<w:gridCol w:w=\"" + w + "\"/>"; }).join("");
+  var h = "<w:tbl><w:tblPr><w:tblStyle w:val=\"TableGrid\"/><w:tblW w:w=\"0\" w:type=\"auto\"/>" +
+    "<w:tblLayout w:type=\"fixed\"/>" + wBordersSingle() + "</w:tblPr><w:tblGrid>" + grid + "</w:tblGrid>";
+  h += wRow(headers.map(function(x, i){
+    return wCell(x, { bold: 1, shd: "1F4E79", color: "FFFFFF", center: 1, tcWDxa: widthsDxa[i], ls: opts.ls || 1 });
+  }).join(""), 9, true);
+  bodyRows.forEach(function(r){ h += r; });
+  return h + "</w:tbl>";
+}
+function wPara(text, opts) {
+  opts = opts || {};
+  var jc = opts.center ? "<w:jc w:val=\"center\"/>" : "";
+  var b = opts.bold ? "<w:b/>" : "";
+  var col = opts.color ? "<w:color w:val=\"" + opts.color + "\"/>" : "";
+  var sz = "<w:sz w:val=\"" + (opts.size || 22) + "\"/>";
+  return "<w:p><w:pPr>" + jc + "</w:pPr><w:r><w:rPr><w:rFonts w:ascii=\"Arial\" w:hAnsi=\"Arial\"/>" +
+    b + col + sz + "</w:rPr><w:t xml:space=\"preserve\">" + xmlEsc(text) + "</w:t></w:r></w:p>";
+}
+function wLabelPara(label, value, center) {
+  return "<w:p><w:pPr>" + (center ? "<w:jc w:val=\"center\"/>" : "") + "</w:pPr>" +
+    "<w:r><w:rPr><w:rFonts w:ascii=\"Arial\" w:hAnsi=\"Arial\"/><w:b/><w:sz w:val=\"22\"/></w:rPr><w:t xml:space=\"preserve\">" + xmlEsc(label) + "</w:t></w:r>" +
+    "<w:r><w:rPr><w:rFonts w:ascii=\"Arial\" w:hAnsi=\"Arial\"/><w:sz w:val=\"22\"/></w:rPr><w:t xml:space=\"preserve\">" + xmlEsc(value) + "</w:t></w:r></w:p>";
+}
+function wStylesXml() {
+  return "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>" +
+    "<w:styles xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\">" +
+    "<w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii=\"Arial\" w:hAnsi=\"Arial\"/><w:sz w:val=\"20\"/></w:rPr></w:rPrDefault></w:docDefaults>" +
+    "<w:style w:type=\"paragraph\" w:styleId=\"Normal\"><w:name w:val=\"Normal\"/>" +
+    "<w:rPr><w:rFonts w:ascii=\"Arial\" w:hAnsi=\"Arial\"/><w:sz w:val=\"20\"/></w:rPr></w:style>" +
+    "<w:style w:type=\"table\" w:styleId=\"TableGrid\"><w:name w:val=\"Table Grid\"/><w:tblPr>" +
+    wBordersSingle() + "</w:tblPr></w:style>" +
+    "</w:styles>";
+}
+function buildDocx() {
+  var part = $("part").value || "", prog = $("prog").value || "";
+  var partFile = $("partfile").value || "", ncf = $("ncfolder").value || "";
+  var date = fmtDocDate(new Date());
+  var cols = visibleCols();
+  var widths = cols.map(function(c){ return mmToTwips(COL_WIDTHS_MM[c.key] || 25); });
+  var n = 0, body = [];
+  rows.filter(function(r){ return r.enabled; }).forEach(function(r){
+    if (r.row_type === "section") {
+      body.push(wRow(wCell(r.row_name, { bold: 1, gridSpan: cols.length, shd: "D9EAF7", tcWDxa: widths[0], ls: 1 }), 9, false));
+      return;
+    }
+    if (r.row_type === "note") {
+      body.push(wRow(wCell("NOTE: " + r.row_name, { gridSpan: cols.length, shd: "FFF2CC", tcWDxa: widths[0], ls: 1 }), 9, false));
+      return;
+    }
+    n++;
+    var cells = cols.map(function(c, i){
+      return wCell(colValue(r, c, n), { tcWDxa: widths[i], center: CENTER_COLS[c.key] ? 1 : 0, ls: 1 });
+    }).join("");
+    body.push(wRow(cells, 9, false));
+  });
+  var metaW = [mmToTwips(95), mmToTwips(95)];
+  var metaRows = [
+    wRow(wCellRich("Programmer: ", prog || "-", { tcWDxa: metaW[0], ls: 1.5 }) +
+         wCellRich("Date: ", date, { tcWDxa: metaW[1], ls: 1.5 }), 8, false),
+    wRow(wCellRich("NX Part File: ", partFile || "-", { gridSpan: 2, tcWDxa: metaW[0], ls: 1.5 }), 8, false)
+  ];
+  if (showNxSourceRow && srcName) {
+    metaRows.push(wRow(wCellRich("HTML Export: ", srcName, { gridSpan: 2, tcWDxa: metaW[0], ls: 1.5 }), 8, false));
+  }
+  var drawingPara = "", extraFiles = [], hasImg = !!drawingDataUrl;
+  var relsExtra = "", typesExtra = "";
+  if (hasImg) {
+    var maxW = 6 * 914400; // 6 inch max width in EMU
+    var emuW = drawingW * 9525, emuH = drawingH * 9525;
+    if (emuW > maxW) { emuH = Math.round(emuH * maxW / emuW); emuW = maxW; }
+    drawingPara = wPara("Setup Drawing", { bold: 1, center: 1 }) +
+      "<w:p><w:pPr><w:jc w:val=\"center\"/></w:pPr><w:r><w:drawing><wp:inline distT=\"0\" distB=\"0\" distL=\"0\" distR=\"0\">" +
+      "<wp:extent cx=\"" + emuW + "\" cy=\"" + emuH + "\"/><wp:docPr id=\"1\" name=\"Setup Drawing\"/>" +
+      "<a:graphic xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\"><a:graphicData uri=\"http://schemas.openxmlformats.org/drawingml/2006/picture\">" +
+      "<pic:pic xmlns:pic=\"http://schemas.openxmlformats.org/drawingml/2006/picture\"><pic:nvPicPr><pic:cNvPr id=\"1\" name=\"drawing\"/>" +
+      "<pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed=\"rIdDrawing\"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>" +
+      "<pic:spPr><a:xfrm><a:off x=\"0\" y=\"0\"/><a:ext cx=\"" + emuW + "\" cy=\"" + emuH + "\"/></a:xfrm>" +
+      "<a:prstGeom prst=\"rect\"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic>" +
+      "</wp:inline></w:drawing></w:r></w:p>";
+    var imgBytes = b64ToBytes(drawingDataUrl.split(",")[1]);
+    var ext = (drawingName.toLowerCase().indexOf(".png") >= 0) ? "png" : "jpg";
+    extraFiles.push({ name: "word/media/drawing." + ext, data: imgBytes });
+    relsExtra = "<Relationship Id=\"rIdDrawing\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/image\" Target=\"media/drawing." + ext + "\"/>";
+    typesExtra = "<Override PartName=\"/word/media/drawing." + ext + "\" ContentType=\"" +
+      (ext === "png" ? "image/png" : "image/jpeg") + "\"/>";
+  }
+  var docXml = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>" +
+    "<w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\" " +
+    "xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\" " +
+    "xmlns:wp=\"http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing\">" +
+    "<w:body>" +
+    wPara("Shop Documentation: " + part, { bold: 1, center: 1, size: 30, color: "1F4E79" }) +
+    "<w:tbl><w:tblPr><w:tblStyle w:val=\"TableGrid\"/><w:tblW w:w=\"0\" w:type=\"auto\"/>" +
+    "<w:tblLayout w:type=\"fixed\"/>" + wBordersSingle() + "</w:tblPr>" +
+    "<w:tblGrid><w:gridCol w:w=\"" + metaW[0] + "\"/><w:gridCol w:w=\"" + metaW[1] + "\"/></w:tblGrid>" +
+    metaRows.join("") + "</w:tbl>" +
+    wPara("", {}) +
+    drawingPara +
+    (ncf ? wLabelPara("NC Program Location: ", ncf, true) : "") +
+    wLabelPara("Total Time: ", totalTimeStr(), true) +
+    wTable(cols.map(function(c){ return c.key; }), body, widths, { ls: 1 }) +
+    wPara("Area / Location and notes remain editable by the programmer.", {}) +
+    "<w:sectPr><w:pgSz w:w=\"11906\" w:h=\"16838\"/><w:pgMar w:top=\"680\" w:bottom=\"680\" w:left=\"680\" w:right=\"680\"/></w:sectPr>" +
+    "</w:body></w:document>";
+  var contentTypes = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" +
+    "<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\">" +
+    "<Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/>" +
+    "<Default Extension=\"xml\" ContentType=\"application/xml\"/>" +
+    "<Override PartName=\"/word/document.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml\"/>" +
+    "<Override PartName=\"/word/styles.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml\"/>" +
+    typesExtra + "</Types>";
+  var rels = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" +
+    "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">" +
+    "<Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"word/document.xml\"/>" +
+    "</Relationships>";
+  var docRels = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" +
+    "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">" + relsExtra + "</Relationships>";
+  var files = [
+    { name: "[Content_Types].xml", data: strBytes(contentTypes) },
+    { name: "_rels/.rels", data: strBytes(rels) },
+    { name: "word/_rels/document.xml.rels", data: strBytes(docRels) },
+    { name: "word/document.xml", data: strBytes(docXml) },
+    { name: "word/styles.xml", data: strBytes(wStylesXml()) }
+  ].concat(extraFiles);
+  return buildStoredZip(files);
+}
+
+/* ================= UI ================= */
+function $(id){ return document.getElementById(id); }
+function esc(s){ return String(s == null ? "" : s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+function status(t){ $("status").textContent = t; }
+function download(name, text, type) {
+  var blob = new Blob([text], { type: type || "text/plain;charset=utf-8" });
+  var a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+}
+
+function renderColToggles() {
+  var box = $("colToggles"); box.innerHTML = "";
+  ALL_COLUMNS.forEach(function(c){
+    if (c.isProg && !hasProgData()) return;
+    var lab = document.createElement("label");
+    var cb = document.createElement("input");
+    cb.type = "checkbox"; cb.style.width = "auto"; cb.checked = !!colVis[c.key];
+    cb.addEventListener("change", function(){ colVis[c.key] = cb.checked; });
+    lab.appendChild(cb);
+    lab.appendChild(document.createTextNode(" " + c.key));
+    box.appendChild(lab);
+  });
+  $("nxSrcRow").checked = !!showNxSourceRow;
+}
+$("nxSrcRow").addEventListener("change", function(){ showNxSourceRow = $("nxSrcRow").checked; });
+
+function refreshDescTable() {  var html = "<tr><th>NX type</th><th>Shop-floor word</th></tr>";
+  Object.keys(customDesc).forEach(function(k){
+    html += "<tr><td>" + esc(k) + "</td><td><input data-nx=\"" + esc(k) + "\" value=\"" + esc(customDesc[k]) + "\"></td></tr>";
+  });
+  $("descTable").innerHTML = html;
+  Array.prototype.forEach.call($("descTable").querySelectorAll("input"), function(inp){
+    inp.addEventListener("change", function(){
+      customDesc[inp.getAttribute("data-nx")] = inp.value;
+      retransform();
+    });
+  });
+}
+function refreshToolTable() {
+  var html = "<tr><th>#</th><th>Min dia</th><th>Max dia</th><th>Add</th><th></th></tr>";
+  toolRule.forEach(function(e, i){
+    html += "<tr><td>" + (i+1) + "</td><td>" + e.min_diameter + "</td><td>" + e.max_diameter + "</td><td>" + e.add_length + "</td>" +
+      "<td><button class=\"ghost\" data-del=\"" + i + "\" style=\"margin:0;padding:4px 8px;width:auto\">x</button></td></tr>";
+  });
+  $("toolTable").innerHTML = html;
+  Array.prototype.forEach.call($("toolTable").querySelectorAll("button[data-del]"), function(b){
+    b.addEventListener("click", function(){
+      toolRule.splice(+b.getAttribute("data-del"), 1);
+      refreshToolTable(); retransform();
+    });
+  });
+}
+/* Re-apply rules to operation rows (like re-running transformers). */
+function retransform() {
+  rows.forEach(function(r){
+    if (r.row_type !== "operation") return;
+    r.description = getDescription(r.nx_description);
+    r.tool_length = calculateToolLength(r.nx_tool_length, r.tool_name);
+  });
+  renderOps();
+}
+
+function renderOps() {
+  var q = ($("q").value || "").toLowerCase();
+  var box = $("ops"); box.innerHTML = "";
+  var shown = 0, enabled = 0;
+  rows.forEach(function(r, i){
+    if (r.row_type === "operation") {
+      var hay = (r.row_name + " " + r.tool_name + " " + r.description + " " + r.nx_description).toLowerCase();
+      if (q && hay.indexOf(q) < 0) return;
+    }
+    shown++;
+    if (r.enabled) enabled++;
+    var div = document.createElement("div");
+    div.className = "op" + (r.enabled ? "" : " disabled") + (r.row_type === "operation" ? "" : " " + r.row_type);
+    var head;
+    if (r.row_type === "operation") {
+      var progPill = "";
+      if (r.program_status === "match") progPill = "<span class=\"pill\">Program: match (" + esc(r.program_file || "") + ")</span>";
+      else if (r.program_status === "mismatch") progPill = "<span class=\"pill off\">Program: " + esc(formatMismatch(r.program_mismatch_fields)) + "</span>";
+      else if (r.program_status === "not_found") progPill = "<span class=\"pill off\">Program: not found</span>";
+      head = "<div class=\"t\">#" + (i+1) + " " + esc(r.row_name) +
+        "<span class=\"pill" + (r.enabled ? "" : " off") + "\">" + (r.enabled ? "ON" : "OFF") + "</span>" + progPill + "</div>" +
+        "<div class=\"m\">" + esc(r.description) + " <span style=\"color:#5b6577\">(" + esc(r.nx_description) + ")</span></div>" +
+        "<div class=\"m\">" + esc(r.tool_name || "-") + "</div>" +
+        "<div class=\"m\" style=\"color:#c9d2e3\">" + esc(toolReadableLine(r)) + "</div>" +
+        "<div class=\"m\">Stock " + esc(formatStock(r.stock)) + " &middot; " + esc(r.time) + "</div>" +
+        "<div class=\"m\">" + esc(r.setup) + " / " + esc(r.geometry) + "</div>";
+    } else if (r.row_type === "section") {
+      head = "<div class=\"t\">SECTION: " + esc(r.row_name) + "</div>";
+    } else {
+      head = "<div class=\"t\" style=\"font-weight:400\">NOTE: " + esc(r.row_name) + "</div>";
+    }
+    div.innerHTML = head;
+    var acts = document.createElement("div");
+    acts.className = "acts";
+    function btn(t, fn, cls) {
+      var b = document.createElement("button");
+      b.textContent = t; b.className = cls || "ghost";
+      b.addEventListener("click", function(){ fn(); });
+      acts.appendChild(b);
+    }
+    btn(r.enabled ? "Disable" : "Enable", function(){ r.enabled = !r.enabled; renderOps(); });
+    btn("Up", function(){ if (i > 0) { rows.splice(i,1); rows.splice(i-1,0,r); renderOps(); } });
+    btn("Down", function(){ if (i < rows.length-1) { rows.splice(i,1); rows.splice(i+1,0,r); renderOps(); } });
+    if (r.row_type !== "operation") btn("Edit", function(){
+      var v = prompt("Text:", r.row_name);
+      if (v !== null) { r.row_name = v; renderOps(); }
+    });
+    btn("Del", function(){ rows.splice(i,1); renderOps(); }, "warn");
+    div.appendChild(acts);
+    box.appendChild(div);
+  });
+  $("cnt").textContent = "— " + enabled + " ON / " + rows.length + " rows";
+  if (!rows.length) box.innerHTML = "<div class=\"hint\">No rows yet — import an NX HTML file.</div>";
+}
+
+$("nxfile").addEventListener("change", function(e){
+  var f = e.target.files[0]; if (!f) return;
+  srcName = f.name;
+  var r = new FileReader();
+  r.onload = function(){
+    try {
+      var parsed = parseNxHtml(String(r.result || ""));
+      nxHeaders = parsed.headers;
+      var doc = buildDocument(interpret(parsed.rows));
+      rows = doc;
+      var partGuess = (f.name.split(/[\\/]/).pop() || "").replace(/\.html?$/i, "").replace(/^Operation Navigator - Geometry - /i, "");
+      if (!$("part").value && partGuess) $("part").value = partGuess;
+      status("Imported " + f.name + ": " + parsed.rows.length + " NX rows -> " + rows.length + " operations (" +
+        rows.filter(function(x){return x.enabled;}).length + " enabled). Columns: " + nxHeaders.join(" | "));
+      renderOps();
+    } catch (err) { status("Import failed: " + err.message); }
+  };
+  r.readAsText(f);
+});
+$("q").addEventListener("input", renderOps);
+$("drawing").addEventListener("change", function(e){
+  var f = e.target.files[0]; if (!f) return;
+  drawingName = f.name;
+  drawingBaseName = f.name.replace(/\.pdf$/i, "");
+  drawingPdfB64 = ""; drawingPdfPages = 0;
+  $("pdfPageRow").style.display = "none";
+  var isPdf = /pdf$/i.test(f.type) || /\.pdf$/i.test(f.name);
+  var r = new FileReader();
+  r.onload = function(){
+    var url = String(r.result || "");
+    if (!isPdf) {
+      drawingDataUrl = url;
+      attachDrawingPreview();
+      return;
+    }
+    // PDF: rendered to image by the Android app (built-in PDF engine, offline).
+    drawingPdfB64 = url.split(",")[1] || "";
+    if (typeof TurnAppNative === "undefined" || !TurnAppNative.pdfPageCountBase64) {
+      $("drawingHint").textContent = "PDF picked (" + drawingName + ") but preview needs the installed Android app — open this page on PC, or install the APK to render PDFs.";
+      status("PDF needs the installed app for rendering. Images preview right here.");
+      return;
+    }
+    var back = String(TurnAppNative.pdfPageCountBase64(drawingPdfB64));
+    if (back.indexOf("PAGES:") === 0) {
+      drawingPdfPages = parseInt(back.slice(6), 10) || 0;
+      $("pdfPage").max = drawingPdfPages;
+      $("pdfPageRow").style.display = "flex";
+      $("drawingHint").innerHTML = "<span class=\"pill off\">PDF attached — not rendered</span> " + drawingName + " (" + drawingPdfPages + " page(s)). <b>In the installed app:</b> auto-renders page 1. <b>In browser:</b> tap Render to preview (requires installed APK).";
+      if (typeof TurnAppNative !== "undefined" && TurnAppNative.renderPdfPageBase64) {
+        renderPdfDrawing();
+      }
+    } else {
+      $("drawingHint").textContent = "Could not read PDF: " + back.replace(/^ERROR:/, "");
+    }
+  };
+  r.readAsDataURL(f);
+});
+function attachDrawingPreview() {
+  var img = new Image();
+  img.onload = function(){
+    drawingW = img.naturalWidth || 0; drawingH = img.naturalHeight || 0;
+    var pv = $("drawingPrev");
+    pv.src = drawingDataUrl; pv.style.display = "block";
+    $("drawingHint").textContent = "Attached: " + drawingName + " (" + drawingW + "x" + drawingH + ") — embedded in sheet, HTML and Word exports.";
+    status("Setup drawing attached: " + drawingName);
+  };
+  img.onerror = function(){ $("drawingHint").textContent = "Could not read " + drawingName + " as an image."; };
+  img.src = drawingDataUrl;
+}
+function renderPdfDrawing() {
+  if (!drawingPdfB64) return;
+  var page = Math.max(1, parseInt($("pdfPage").value || "1", 10));
+  if (drawingPdfPages && page > drawingPdfPages) page = drawingPdfPages;
+  $("pdfPage").value = page;
+  if (typeof TurnAppNative === "undefined" || !TurnAppNative.renderPdfPageBase64) {
+    $("drawingHint").textContent = "PDF rendering needs the installed Android app. Install the APK to render PDF drawings.";
+    return;
+  }
+  $("drawingHint").textContent = "Rendering PDF page " + page + "...";
+  var back;
+  try {
+    back = String(TurnAppNative.renderPdfPageBase64(drawingPdfB64, page - 1, 1600));
+  } catch (err) { back = "ERROR:" + err.message; }
+  if (back.indexOf("ERROR:") === 0) {
+    $("drawingHint").textContent = "PDF render failed: " + back.slice(6);
+    return;
+  }
+  drawingDataUrl = "data:image/png;base64," + back;
+  drawingName = drawingBaseName + " p" + page + ".png";
+  attachDrawingPreview();
+}
+$("pdfRender").addEventListener("click", renderPdfDrawing);
+$("progfiles").addEventListener("change", function(e){
+  var files = Array.prototype.slice.call(e.target.files || []);
+  e.target.value = ""; // allow picking the same files again / adding more rounds
+  if (!files.length) return;
+  var pending = files.length, added = 0;
+  files.forEach(function(f){
+    function done() {
+      if (--pending === 0) {
+        renderProgList();
+        status(progFiles.length + " program file(s) ready (" + added + " just added). Tap Compare." +
+          " Tip: pick again to add more — like choosing a folder on PC.");
+      }
+    }
+    if (!/\.(ptp|mpf|nc)$/i.test(f.name)) { done(); return; }
+    var r = new FileReader();
+    r.onload = function(){
+      var item = { name: f.name, text: String(r.result || ""), data: null };
+      var ix = -1;
+      for (var i = 0; i < progFiles.length; i++) {
+        if (progFiles[i].name.toLowerCase() === f.name.toLowerCase()) { ix = i; break; }
+      }
+      if (ix >= 0) progFiles[ix] = item; else { progFiles.push(item); added++; }
+      done();
+    };
+    r.onerror = done;
+    r.readAsText(f);
+  });
+});
+function renderProgList() {
+  var box = $("progList"); box.innerHTML = "";
+  if (!progFiles.length) { box.innerHTML = "<div class=\"hint\">No program files picked yet.</div>"; return;
+  }
+  var t = document.createElement("div"); t.className = "hint";
+  t.textContent = progFiles.length + " file(s):";
+  box.appendChild(t);
+  progFiles.forEach(function(f){
+    var div = document.createElement("div");
+    div.className = "fileitem";
+    var b = document.createElement("b"); b.textContent = f.name;
+    var x = document.createElement("button");
+    x.textContent = "Remove"; x.className = "ghost";
+    x.addEventListener("click", function(){
+      progFiles = progFiles.filter(function(g){ return g !== f; });
+      renderProgList();
+    });
+    div.appendChild(b); div.appendChild(x);
+    box.appendChild(div);
+  });
+}
+$("btnProgClear").addEventListener("click", function(){ progFiles = []; renderProgList(); status("Program file list cleared."); });
+function unpackZipFile(f) {
+  function stage(t) {
+    $("zipStage").textContent = t;
+    status(t);
+  }
+  try {
+    if (!f) {
+      stage("Browser returned 0 files — copy the .zip into the Downloads folder (phone storage, not Google Drive/cloud) and pick it from Downloads. If it still fails, use the backup picker below it.");
+      return;
+    }
+    if (!/\.zip$/i.test(f.name || "")) {
+      stage("'" + (f.name || "that file") + "' is not a .zip — pick your zipped programs file.");
+      return;
+    }
+    stage("Reading " + f.name + " (" + Math.round((f.size || 0) / 1024) + " KB)...");
+    var r = new FileReader();
+    r.onload = function(){
+      try {
+        stage("Unpacking " + f.name + "...");
+        var bytes = new Uint8Array(r.result || []);
+        var entries = zipReadEntries(bytes);
+        var added = 0, skipped = 0;
+        var dec = (typeof TextDecoder !== "undefined") ? new TextDecoder("utf-8") : null;
+        entries.forEach(function(en){
+          if (!/\.(ptp|mpf|nc)$/i.test(en.name)) { skipped++; return; }
+          var text = dec ? dec.decode(en.data) : String(en.data);
+          var item = { name: en.name, text: text, data: null };
+          var ix = -1;
+          for (var i = 0; i < progFiles.length; i++) {
+            if (progFiles[i].name.toLowerCase() === en.name.toLowerCase()) { ix = i; break; }
+          }
+          if (ix >= 0) progFiles[ix] = item; else { progFiles.push(item); added++; }
+        });
+        renderProgList();
+        stage("Zip " + f.name + ": " + added + " program file(s) added, " + skipped + " other file(s) ignored. Total ready: " + progFiles.length + ". Tap Compare.");
+      } catch (err) {
+        stage("Could not unpack " + f.name + ": " + (err && err.message || err));
+      }
+    };
+    r.onerror = function(){ stage("Could not read " + f.name + " (phone blocked the file — copy it to Downloads and try again)."); };
+    r.readAsArrayBuffer(f);
+    setTimeout(function(){
+      if ($("zipStage").textContent.indexOf("Reading ") === 0) {
+        stage("Still reading " + f.name + "... large zips take a few seconds. Wait for the result message.");
+      }
+    }, 3000);
+  } catch (err) {
+    stage("Zip failed before reading: " + (err && err.message || err));
+  }
+}
+$("progzip").addEventListener("change", function(e){
+  var f = (e.target.files || [])[0];
+  e.target.value = "";
+  unpackZipFile(f);
+});
+$("progzipAny").addEventListener("change", function(e){
+  var f = (e.target.files || [])[0];
+  e.target.value = "";
+  unpackZipFile(f);
+});
+$("btnCompare").addEventListener("click", function(){
+  if (!rows.length) { status("Import NX HTML first, then compare."); return; }
+  if (!progFiles.length) { status("Pick .ptp/.MPF program files first."); return; }
+  var s = runProgramCompare();
+  status("Program check: " + s.match + " match, " + s.mismatch + " mismatch, " + s.missing + " not found (" + progFiles.length + " files). Green/red pills on each row; details go into Word/CSV exports.");
+});
+$("btnDocx").addEventListener("click", function(){
+  if (!rows.length) { status("Nothing to export — import NX HTML first."); return; }
+  try {
+    var blob = buildDocx();
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = ((($("part").value || "camsheet") + "_sheet.docx").replace(/[\\/:*?"<>|]/g, "_"));
+    document.body.appendChild(a); a.click();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+    status("Word file downloaded (check Downloads) — opens in MS Word / WPS.");
+  } catch (err) { status("Word export failed: " + err.message); }
+});
+$("descReset").addEventListener("click", function(){ customDesc = Object.assign({}, DEFAULT_DESC); refreshDescTable(); retransform(); });
+$("trAddBtn").addEventListener("click", function(){
+  toolRule.push({ min_diameter: +$("trMin").value || 0, max_diameter: +$("trMax").value || 0, add_length: +$("trAdd").value || 0 });
+  refreshToolTable(); retransform();
+});
+$("trReset").addEventListener("click", function(){ toolRule = defaultToolRule(); refreshToolTable(); retransform(); });
+$("addNote").addEventListener("click", function(){
+  var v = prompt("Note text:"); if (v === null) return;
+  rows.push({ enabled: true, row_type: "note", row_name: v, tool_name: "", tool_length: "", stock: "", time: "", description: "", area: "", nx_tool_length: "", nx_description: "", feed: "", speed: "", depth_of_cut: "", gouge_check: "", setup: "", geometry: "" });
+  renderOps();
+});
+$("addSection").addEventListener("click", function(){
+  var v = prompt("Section title:"); if (v === null) return;
+  rows.push({ enabled: true, row_type: "section", row_name: v, tool_name: "", tool_length: "", stock: "", time: "", description: "", area: "", nx_tool_length: "", nx_description: "", feed: "", speed: "", depth_of_cut: "", gouge_check: "", setup: "", geometry: "" });
+  renderOps();
+});
+
+/* ---- exports: printable sheet mirrors word_generator title/metadata/table policy ---- */
+function sheetHtml() {
+  var part = $("part").value || "Untitled part";
+  var prog = $("prog").value || "";
+  var ncf = $("ncfolder").value || "";
+  var partFile = $("partfile").value || "";
+  var date = fmtDocDate(new Date());
+  var on = rows.filter(function(r){ return r.enabled; });
+  var cols = visibleCols();
+  var h = "<h1>Shop Documentation: " + esc(part) + "</h1>";
+  h += "<table><tr><th>Programmer</th><td>" + esc(prog || "-") + "</td><th>Date</th><td>" + esc(date) + "</td></tr>" +
+       "<tr><th>NX Part File</th><td colspan=\"3\">" + esc(partFile || "-") + "</td></tr>";
+  if (showNxSourceRow && srcName) h += "<tr><th>HTML Export</th><td colspan=\"3\">" + esc(srcName) + "</td></tr>";
+  h += "</table><br>";
+  if (drawingDataUrl) h += "<h3>Setup Drawing</h3><img src=\"" + drawingDataUrl + "\" style=\"max-width:100%\">";
+  if (ncf) h += "<p style=\"text-align:center\"><b>NC Program Location:</b> " + esc(ncf) + "</p>";
+  h += "<p style=\"text-align:center\"><b>Total Time:</b> " + esc(totalTimeStr()) + "</p>";
+  h += "<table><thead><tr>" + cols.map(function(c){ return "<th>" + esc(c.key) + "</th>"; }).join("") + "</tr></thead><tbody>";
+  var n = 0;
+  on.forEach(function(r){
+    if (r.row_type === "section") { h += "<tr><td colspan=\"" + cols.length + "\" style=\"background:#D9EAF7\"><b>" + esc(r.row_name) + "</b></td></tr>"; return; }
+    if (r.row_type === "note") { h += "<tr><td colspan=\"" + cols.length + "\" style=\"background:#FFF2CC\">NOTE: " + esc(r.row_name) + "</td></tr>"; return; }
+    n++;
+    h += "<tr>" + cols.map(function(c){
+      var v = colValue(r, c, n);
+      var al = CENTER_COLS[c.key] ? " style=\"text-align:center\"" : "";
+      return "<td" + al + ">" + esc(v) + "</td>";
+    }).join("") + "</tr>";
+  });
+  h += "</tbody></table><p>Area / Location and notes remain editable by the programmer.</p>";
+  return h;
+}
+$("btnPrint").addEventListener("click", function(){
+  if (!rows.length) { status("Nothing to print — import NX HTML first."); return; }
+  $("sheet").innerHTML = sheetHtml();
+  window.print();
+});
+$("btnHtml").addEventListener("click", function(){
+  if (!rows.length) { status("Nothing to export — import NX HTML first."); return; }
+  var html = "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>Shop Documentation</title></head><body>" + sheetHtml() + "</body></html>";
+  download((($("part").value || "camsheet") + "_sheet.html").replace(/[\\/:*?"<>|]/g, "_"), html, "text/html;charset=utf-8");
+  status("Sheet HTML downloaded (check Downloads).");
+});
+$("btnCsv").addEventListener("click", function(){
+  if (!rows.length) { status("Nothing to export — import NX HTML first."); return; }
+  function q(v){ v = String(v == null ? "" : v); return /[",\n]/.test(v) ? "\"" + v.replace(/"/g, "\"\"") + "\"" : v; }
+  var cols = visibleCols();
+  var lines = [cols.map(function(c){ return c.key; }).concat(["Tool_Full", "Setup", "Geometry", "Enabled", "Type", "ProgramStatus", "ProgramFile", "MismatchFields"]).map(q).join(",")];
+  var n = 0;
+  rows.forEach(function(r){
+    if (r.row_type !== "operation") {
+      lines.push(cols.map(function(){ return ""; }).concat(["", "", "", r.enabled ? "yes" : "no", r.row_type, "", "", ""]).map(q).join(","));
+      return;
+    }
+    n++;
+    lines.push(cols.map(function(c){ return colValue(r, c, n); }).concat([r.tool_name, r.setup, r.geometry, r.enabled ? "yes" : "no", "operation", r.program_status || "", r.program_file || "", formatMismatch(r.program_mismatch_fields)]).map(q).join(","));
+  });
+  download((($("part").value || "camsheet") + "_table.csv").replace(/[\\/:*?"<>|]/g, "_"), lines.join("\n"), "text/csv;charset=utf-8");
+  status("CSV downloaded: " + n + " operations.");
+});
+$("btnSave").addEventListener("click", function(){
+  var proj = { app: "camsheet-turnapp", version: 4, part: $("part").value, programmer: $("prog").value,
+    ncfolder: $("ncfolder").value, partfile: $("partfile").value, srcName: srcName,
+    colVis: colVis, showNxSourceRow: showNxSourceRow,
+    drawing: drawingDataUrl ? { name: drawingName, dataUrl: drawingDataUrl, w: drawingW, h: drawingH } : null,
+    drawingPdf: drawingPdfB64 ? { name: drawingBaseName, dataUrl: drawingPdfB64, pages: drawingPdfPages } : null,
+    progFiles: progFiles.map(function(f){ return { name: f.name, text: f.text }; }),
+    customDesc: customDesc, toolRule: toolRule, rows: rows };
+  download((($("part").value || "camsheet") + ".camsheet.json").replace(/[\\/:*?"<>|]/g, "_"), JSON.stringify(proj, null, 1), "application/json");
+  status("Project saved (.json) — keep it to reopen later or on PC.");
+});
+$("btnLoadPick").addEventListener("click", function(){ $("projfile").click(); });
+$("projfile").addEventListener("change", function(e){
+  var f = e.target.files[0]; if (!f) return;
+  var r = new FileReader();
+  r.onload = function(){
+    try {
+      var p = JSON.parse(String(r.result || ""));
+      $("part").value = p.part || ""; $("prog").value = p.programmer || "";
+      $("ncfolder").value = p.ncfolder || ""; $("partfile").value = p.partfile || "";
+      srcName = p.srcName || f.name;
+      if (p.drawing && p.drawing.dataUrl) {
+        drawingDataUrl = p.drawing.dataUrl; drawingName = p.drawing.name || "";
+        drawingW = p.drawing.w || 0; drawingH = p.drawing.h || 0;
+        var pv = $("drawingPrev"); pv.src = drawingDataUrl; pv.style.display = "block";
+        $("drawingHint").textContent = "Attached: " + drawingName + " (restored from project).";
+      }
+      if (p.drawingPdf && p.drawingPdf.dataUrl) {
+        drawingPdfB64 = p.drawingPdf.dataUrl;
+        drawingBaseName = p.drawingPdf.name || "";
+        drawingPdfPages = p.drawingPdf.pages || 0;
+        drawingName = drawingBaseName; // original PDF name for hint
+        $("drawingHint").innerHTML = "<span class=\"pill off\">PDF restored — not rendered</span> " + drawingBaseName + " (" + drawingPdfPages + " page(s)). Tap Render in the installed app.";
+        if (drawingPdfPages) { $("pdfPage").max = drawingPdfPages; $("pdfPageRow").style.display = "flex"; }
+      }
+      progFiles = (p.progFiles || []).map(function(x){ return { name: x.name, text: x.text, data: null }; });
+      if (p.customDesc) customDesc = p.customDesc;
+      if (p.toolRule) toolRule = p.toolRule;
+      if (p.colVis) colVis = p.colVis;
+      showNxSourceRow = !!p.showNxSourceRow;
+      rows = p.rows || [];
+      refreshDescTable(); refreshToolTable(); renderOps(); renderColToggles(); renderProgList();
+      status("Project loaded: " + rows.length + " rows from " + f.name);
+    } catch (err) { status("Load failed: " + err.message); }
+  };
+  r.readAsText(f);
+  e.target.value = "";
+});
+
+refreshDescTable(); refreshToolTable(); renderOps(); renderColToggles(); renderProgList();
+</script>
+</body>
+</html>

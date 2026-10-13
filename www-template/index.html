@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>My Tool — TurnApp template</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, Roboto, Arial, sans-serif; margin: 0; background: #14171d; color: #e8eaf0; }
+  header { padding: 18px 16px 10px; border-left: 6px solid #ff8c1a; margin: 14px 14px 0; background: #1b1f27; border-radius: 10px; }
+  header h1 { margin: 0; font-size: 20px; }
+  header p { margin: 4px 0 0; color: #9aa3b5; font-size: 13px; letter-spacing: 1px; }
+  main { padding: 14px; max-width: 720px; margin: 0 auto; }
+  .card { background: #1b1f27; border-radius: 10px; padding: 14px; margin-bottom: 12px; }
+  label { display: block; font-size: 13px; color: #9aa3b5; margin: 8px 0 4px; }
+  input, button, textarea, select { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #333b49; font-size: 16px; }
+  input, textarea, select { background: #10131a; color: #fff; }
+  button { background: #ff8c1a; color: #111; font-weight: 700; border: none; margin-top: 10px; }
+  button.ghost { background: #262d3a; color: #fff; }
+  pre { background: #0d1016; padding: 10px; border-radius: 8px; overflow: auto; max-height: 300px; font-size: 12px; }
+  .row { display: flex; gap: 8px; } .row > * { flex: 1; }
+</style>
+</head>
+<body>
+<header><h1>My Tool</h1><p>TURNAPP TEMPLATE • OFFLINE</p></header>
+<main>
+  <div class="card">
+    <label>Pick input file</label>
+    <input id="file" type="file">
+    <div class="row">
+      <div><label>Option A</label><input id="optA" type="number" value="1"></div>
+      <div><label>Option B</label><input id="optB" type="number" value="1"></div>
+    </div>
+    <button id="go">Process</button>
+    <button id="dl" class="ghost" disabled>Download result</button>
+  </div>
+  <div class="card"><label>Preview</label><pre id="prev">Pick a file to preview…</pre></div>
+  <div class="card"><label>Status</label><pre id="status">Ready. Works offline.</pre></div>
+</main>
+<script>
+// TEMPLATE: replace processText() with YOUR python logic ported to JS.
+"use strict";
+let lastName = "output.txt", lastText = "";
+const $ = id => document.getElementById(id);
+
+$("file").addEventListener("change", e => {
+  const f = e.target.files[0]; if (!f) return;
+  lastName = f.name;
+  const r = new FileReader();
+  r.onload = () => { lastText = String(r.result || ""); $("prev").textContent = lastText.slice(0, 4000); $("status").textContent = "Loaded " + f.name + " (" + lastText.length + " chars)"; };
+  r.readAsText(f);
+});
+
+function processText(text, a, b) {
+  // TODO: port your python function here. Example: return text.toUpperCase();
+  return text;
+}
+
+$("go").addEventListener("click", () => {
+  if (!lastText) { $("status").textContent = "Pick a file first."; return; }
+  const out = processText(lastText, +$("optA").value, +$("optB").value);
+  lastText = out; $("prev").textContent = out.slice(0, 4000);
+  $("status").textContent = "Done. " + out.length + " chars.";
+  $("dl").disabled = false;
+});
+
+$("dl").addEventListener("click", () => {
+  const blob = new Blob([lastText], { type: "text/plain" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = lastName; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,71 @@
+name: build-apk
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "apps/**"
+      - "template/**"
+      - "apps.json"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read active app
+        id: cfg
+        run: |
+          APP=$(python3 -c "import json;print(json.load(open('apps.json'))['active'])")
+          echo "app=$APP" >> $GITHUB_OUTPUT
+          python3 -c "import json;d=json.load(open('apps.json'));m=d['apps'][d['active']];print('TITLE='+m['title']);print('PKG='+m['package']);print('VCODE='+str(m['versionCode']));print('VNAME='+m['versionName']);print('SRC='+m['src'])" >> $GITHUB_OUTPUT
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install Gradle 8.7
+        run: |
+          cd /tmp && wget -q https://services.gradle.org/distributions/gradle-8.7-bin.zip && unzip -q gradle-8.7-bin.zip && echo "/tmp/gradle-8.7/bin" >> $GITHUB_PATH
+
+      - name: Stage template + inject app
+        run: |
+          APP="${{ steps.cfg.outputs.app }}"
+          SRC=$(python3 -c "import json;print(json.load(open('apps.json'))['apps']['$APP']['src'])")
+          TITLE=$(python3 -c "import json;print(json.load(open('apps.json'))['apps']['$APP']['title'])")
+          PKG=$(python3 -c "import json;print(json.load(open('apps.json'))['apps']['$APP']['package'])")
+          VCODE=$(python3 -c "import json;print(json.load(open('apps.json'))['apps']['$APP']['versionCode'])")
+          VNAME=$(python3 -c "import json;print(json.load(open('apps.json'))['apps']['$APP']['versionName'])")
+          echo "Building $APP ($TITLE $PKG v$VNAME) from $SRC"
+          rm -rf .build && mkdir -p .build
+          cp -r template ".build/$APP"
+          mkdir -p ".build/$APP/app/src/main/assets/app"
+          cp "$SRC" ".build/$APP/app/src/main/assets/app/index.html"
+          sed -i "s/namespace = \".*\"/namespace = \"$PKG\"/" ".build/$APP/app/build.gradle"
+          sed -i "s/applicationId = \".*\"/applicationId = \"$PKG\"/" ".build/$APP/app/build.gradle"
+          sed -i "s/versionCode = .*/versionCode = $VCODE/" ".build/$APP/app/build.gradle"
+          sed -i "s/versionName = \".*\"/versionName = \"$VNAME\"/" ".build/$APP/app/build.gradle"
+          sed -i "s/android:label=\".*\"/android:label=\"$TITLE\"/" ".build/$APP/app/src/main/AndroidManifest.xml"
+          sed -i "s|<string name=\"app_name\">.*</string>|<string name=\"app_name\">$TITLE</string>|" ".build/$APP/app/src/main/res/values/strings.xml"
+          # move package dir
+          PKGDIR=$(echo "$PKG" | tr . /)
+          mkdir -p ".build/$APP/app/src/main/java/$PKGDIR"
+          sed "s/package com.turnapp.factory/package $PKG/" ".build/$APP/app/src/main/java/com/turnapp/factory/MainActivity.kt" > ".build/$APP/app/src/main/java/$PKGDIR/MainActivity.kt"
+          # Delete ONLY the old factory file (new dir may live under com/turnapp too)
+          rm ".build/$APP/app/src/main/java/com/turnapp/factory/MainActivity.kt"
+          rmdir ".build/$APP/app/src/main/java/com/turnapp/factory" 2>/dev/null || true
+
+      - name: Build debug APK
+        run: |
+          APP="${{ steps.cfg.outputs.app }}"
+          cd ".build/$APP"
+          gradle assembleDebug --no-daemon
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug-apk
+          path: .build/${{ steps.cfg.outputs.app }}/app/build/outputs/apk/debug/app-debug.apk
