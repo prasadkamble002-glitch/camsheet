@@ -36,6 +36,12 @@
   .op .acts button { width: auto; padding: 6px 10px; font-size: 12px; margin: 0; }
   .op.note { border-left: 4px solid #e3b341; }
   .op.section { border-left: 4px solid #2f81f7; background: #18202e; }
+  .op.pmatch { border-left: 4px solid #2ea043; }
+  .op.pmismatch { border-left: 4px solid #f85149; }
+  .op.pnotfound { border-left: 4px solid #e3b341; }
+  .issuebar { position: sticky; top: 0; z-index: 5; background: #1b1f27; border: 1px solid #2f81f7; border-radius: 8px; padding: 8px 10px; margin: 8px 0; display: flex; gap: 8px; align-items: center; font-size: 13px; flex-wrap: wrap; }
+  .issuebar button { width: auto; padding: 6px 12px; font-size: 13px; margin: 0; }
+  .issuebar .sum { font-weight: 700; }
   .pill { display: inline-block; background: #0d3b1e; color: #7dffa8; border-radius: 20px; padding: 1px 9px; font-size: 11px; margin-left: 6px; }
   .pill.off { background: #3b1a1a; color: #ff9d9d; }
   .fileitem { background: #10131a; border: 1px solid #2a3140; border-radius: 8px; padding: 8px 10px; margin-top: 6px; display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; }
@@ -57,7 +63,7 @@
 <body>
 <header>
   <h1>CAMSheet</h1>
-  <p>VERSION 1.5 • ANDROID • OFFLINE — ported from CAMSheet-v4 pipeline</p>
+  <p>VERSION 1.6 • ANDROID • OFFLINE — ported from CAMSheet-v4 pipeline</p>
 </header>
 <main>
   <div class="card">
@@ -113,6 +119,12 @@
     <h2>4. Operations <span id="cnt"></span></h2>
     <label>Search</label>
     <input id="q" placeholder="Filter by name, tool, description...">
+    <div id="issueBar" class="issuebar" style="display:none">
+      <span class="sum" id="issueSum"></span>
+      <span id="issuePos"></span>
+      <button id="issuePrev" class="ghost">&#8593; Prev issue</button>
+      <button id="issueNext" class="ghost">Next issue &#8595;</button>
+    </div>
     <div id="ops"></div>
     <div class="row">
       <div><button id="addNote" class="ghost">+ Note row</button></div>
@@ -1065,6 +1077,7 @@ function renderOps() {
   var q = ($("q").value || "").toLowerCase();
   var box = $("ops"); box.innerHTML = "";
   var shown = 0, enabled = 0;
+  visibleIssues = [];
   rows.forEach(function(r, i){
     if (r.row_type === "operation") {
       var hay = (r.row_name + " " + r.tool_name + " " + r.description + " " + r.nx_description).toLowerCase();
@@ -1073,7 +1086,14 @@ function renderOps() {
     shown++;
     if (r.enabled) enabled++;
     var div = document.createElement("div");
-    div.className = "op" + (r.enabled ? "" : " disabled") + (r.row_type === "operation" ? "" : " " + r.row_type);
+    var cls = "op" + (r.enabled ? "" : " disabled") + (r.row_type === "operation" ? "" : " " + r.row_type);
+    if (r.row_type === "operation") {
+      if (r.program_status === "match") cls += " pmatch";
+      else if (r.program_status === "mismatch") cls += " pmismatch";
+      else if (r.program_status === "not_found") cls += " pnotfound";
+    }
+    div.className = cls;
+    div.setAttribute("data-ri", i);
     var head;
     if (r.row_type === "operation") {
       var progPill = "";
@@ -1111,10 +1131,70 @@ function renderOps() {
     btn("Del", function(){ rows.splice(i,1); renderOps(); }, "warn");
     div.appendChild(acts);
     box.appendChild(div);
+    if (r.row_type === "operation" &&
+        (r.program_status === "mismatch" || r.program_status === "not_found")) {
+      visibleIssues.push({ ri: i, el: div, kind: r.program_status });
+    }
   });
   $("cnt").textContent = "— " + enabled + " ON / " + rows.length + " rows";
   if (!rows.length) box.innerHTML = "<div class=\"hint\">No rows yet — import an NX HTML file.</div>";
+  updateIssueBar();
 }
+/* ---- pinned issue navigator: red/amber rows above & below your scroll ---- */
+var visibleIssues = [];
+var issueTicking = false;
+function issueCounts() {
+  var m = 0, x = 0, nf = 0;
+  rows.forEach(function(r){
+    if (r.row_type !== "operation") return;
+    if (r.program_status === "match") m++;
+    else if (r.program_status === "mismatch") x++;
+    else if (r.program_status === "not_found") nf++;
+  });
+  return { match: m, mismatch: x, notfound: nf };
+}
+function updateIssueBar() {
+  var bar = $("issueBar");
+  if (!hasProgData() || !visibleIssues.length) { bar.style.display = "none"; return; }
+  bar.style.display = "flex";
+  var c = issueCounts();
+  var above = 0, below = 0;
+  var vh = window.innerHeight || 600;
+  visibleIssues.forEach(function(it){
+    try {
+      var rc = it.el.getBoundingClientRect();
+      if (rc.bottom < 70) above++;
+      else if (rc.top > vh) below++;
+    } catch (e) {}
+  });
+  $("issueSum").textContent = "\u2713" + c.match + " \u2717" + c.mismatch + " ?" + c.notfound;
+  $("issuePos").textContent = above || below
+    ? ("issues: " + above + " above \u00B7 " + below + " below")
+    : "all issues visible";
+}
+function jumpIssue(dir) {
+  if (!visibleIssues.length) return;
+  var mid = (window.innerHeight || 600) / 2;
+  var best = null, bestD = 1e12;
+  visibleIssues.forEach(function(it){
+    try {
+      var rc = it.el.getBoundingClientRect();
+      var d = (rc.top + rc.bottom) / 2 - mid;
+      if (dir < 0 && d < -4 && -d < bestD) { best = it; bestD = -d; }
+      if (dir > 0 && d > 4 && d < bestD) { best = it; bestD = d; }
+    } catch (e) {}
+  });
+  if (!best) best = dir < 0 ? visibleIssues[visibleIssues.length - 1] : visibleIssues[0];
+  try { best.el.scrollIntoView({ block: "center" }); } catch (e) {}
+  setTimeout(updateIssueBar, 350);
+}
+window.addEventListener("scroll", function(){
+  if (issueTicking) return;
+  issueTicking = true;
+  setTimeout(function(){ issueTicking = false; updateIssueBar(); }, 120);
+}, { passive: true });
+$("issuePrev").addEventListener("click", function(){ jumpIssue(-1); });
+$("issueNext").addEventListener("click", function(){ jumpIssue(1); });
 
 $("nxfile").addEventListener("change", function(e){
   var f = e.target.files[0]; if (!f) return;

@@ -1,0 +1,32 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- CAMSheet logo: white page + blue steps + amber dot (matches icons/logo-icon-filled.svg) -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="4.5"
+        android:strokeLineJoin="round"
+        android:pathData="M32,20 H64 L80,36 V86 Q80,92 74,92 H32 Q26,92 26,86 V26 Q26,20 32,20 Z" />
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="4.5"
+        android:strokeLineJoin="round"
+        android:pathData="M64,20 V32 Q64,36 68,36 H80" />
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#5FA8FF"
+        android:strokeWidth="4.5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M38,78 L38,67 L49,67 L49,56 L59,56 L59,43 L70,43 L70,31" />
+    <path
+        android:fillColor="#5FA8FF"
+        android:pathData="M34.5,78 a3.5,3.5 0 1,0 7,0 a3.5,3.5 0 1,0 -7,0 Z" />
+    <path
+        android:fillColor="#F2A93B"
+        android:pathData="M65,31 a5,5 0 1,0 10,0 a5,5 0 1,0 -10,0 Z" />
+</vector>

@@ -12,8 +12,8 @@
     "camsheet": {
       "title": "CAMSheet",
       "package": "com.turnapp.camsheet",
-      "versionCode": 6,
-      "versionName": "1.5",
+      "versionCode": 7,
+      "versionName": "1.6",
       "src": "apps/camsheet/index.html",
       "portedFrom": "D:\\Research for projects\\CAMSheet-v4 :: pipeline + rules + program_validator + time_utils + word_generator policy. Phone does real .docx (offline), PDF/image drawings, NC program check, column toggles. .xlsx still needs PC."
     }

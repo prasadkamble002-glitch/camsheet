@@ -7,6 +7,8 @@
     <!-- APP_LABEL replaced by Build-APK.ps1 -->
     <application
         android:label="TurnApp"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
         android:theme="@style/Theme.TurnApp"
         android:allowBackup="true"
         android:supportsRtl="true">
