@@ -3,10 +3,13 @@
 // Supports: JavaScript, <input type=file> picker, Blob downloads via DownloadManager.
 package com.turnapp.factory
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.app.DownloadManager
+import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.pdf.PdfRenderer
@@ -15,6 +18,9 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.os.ParcelFileDescriptor
+import android.print.PrintAttributes
+import android.print.PrintManager
+import android.provider.MediaStore
 import android.util.Base64
 import android.webkit.JavascriptInterface
 import android.webkit.URLUtil
@@ -26,13 +32,18 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import java.io.ByteArrayOutputStream
 import java.io.File
 
 /** Renders PDF pages to PNG using the built-in PdfRenderer (no libraries, offline).
  *  Called from app pages as TurnAppNative.renderPdfPageBase64(pdfBase64, pageIndex, targetWidthPx)
  *  Returns PNG base64, or "ERROR:..." on failure. */
-class PdfBridge(private val ctx: Context) {
+class PdfBridge(
+    private val ctx: Context,
+    private val web: WebView,
+    private val askPerm: () -> Unit
+) {
 
     @JavascriptInterface
     fun pdfPageCountBase64(pdfBase64: String): String {
@@ -81,12 +92,83 @@ class PdfBridge(private val ctx: Context) {
             "ERROR:" + (e.message ?: "render failed")
         }
     }
+
+    /** WebView cannot download blob: URLs, so pages send file bytes here as base64. */
+    @JavascriptInterface
+    fun saveFileBase64(fileName: String, base64: String, mimeType: String): String {
+        if (!hasWritePermission()) return "ERROR:NOPERM"
+        return try {
+            val bytes = Base64.decode(base64, Base64.DEFAULT)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val values = ContentValues().apply {
+                    put(MediaStore.Downloads.DISPLAY_NAME, fileName)
+                    put(MediaStore.Downloads.MIME_TYPE, mimeType)
+                    put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+                }
+                val uri = ctx.contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                    ?: return "ERROR:cannot create file in Downloads"
+                ctx.contentResolver.openOutputStream(uri)!!.use { it.write(bytes) }
+                "OK:Downloads/$fileName"
+            } else {
+                val dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                dir.mkdirs()
+                val f = File(dir, fileName)
+                f.writeBytes(bytes)
+                "OK:" + f.absolutePath
+            }
+        } catch (e: Exception) {
+            "ERROR:" + (e.message ?: "write failed")
+        }
+    }
+
+    @JavascriptInterface
+    fun hasWritePermission(): Boolean {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) return true
+        return ContextCompat.checkSelfPermission(
+            ctx, Manifest.permission.WRITE_EXTERNAL_STORAGE
+        ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    @JavascriptInterface
+    fun requestWritePermission(): Boolean {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) return true
+        if (hasWritePermission()) return true
+        askPerm()
+        return false
+    }
+
+    /** Android print dialog -> "Save as PDF" (works offline, no libraries). */
+    @JavascriptInterface
+    fun printPage(): String {
+        return try {
+            val pm = ctx.getSystemService(Context.PRINT_SERVICE) as PrintManager
+            val adapter = web.createPrintDocumentAdapter("TurnApp sheet")
+            pm.print("TurnApp sheet", adapter, PrintAttributes.Builder().build())
+            "OK"
+        } catch (e: Exception) {
+            "ERROR:" + (e.message ?: "print failed")
+        }
+    }
 }
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var web: WebView
     private var fileCallback: ValueCallback<Array<Uri>>? = null
+
+    // Android 9 and older need WRITE_EXTERNAL_STORAGE to write into Downloads.
+    // Android 10+ uses MediaStore and needs no permission at all.
+    private val permLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (!granted) {
+            android.widget.Toast.makeText(
+                this,
+                "Storage permission denied — turn it on in Settings > Apps > CAMSheet > Permissions.",
+                android.widget.Toast.LENGTH_LONG
+            ).show()
+        }
+    }
 
     private val pickFiles = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -111,7 +193,10 @@ class MainActivity : AppCompatActivity() {
 
         web = WebView(this)
         setContentView(web)
-        web.addJavascriptInterface(PdfBridge(this), "TurnAppNative")
+        web.addJavascriptInterface(
+            PdfBridge(this, web) { permLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE) },
+            "TurnAppNative"
+        )
 
         val s: WebSettings = web.settings
         s.javaScriptEnabled = true

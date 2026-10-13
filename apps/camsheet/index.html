@@ -970,12 +970,43 @@ function buildDocx() {
 function $(id){ return document.getElementById(id); }
 function esc(s){ return String(s == null ? "" : s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
 function status(t){ $("status").textContent = t; }
-function download(name, text, type) {
-  var blob = new Blob([text], { type: type || "text/plain;charset=utf-8" });
+function downloadBlob(name, blob, done) {
+  done = done || function(){};
+  // Android WebView cannot download blob: URLs, so hand the bytes to native code.
+  var bridge = (typeof TurnAppNative !== "undefined") ? TurnAppNative : null;
+  if (bridge && bridge.saveFileBase64) {
+    try {
+      if (bridge.hasWritePermission && !bridge.hasWritePermission()) {
+        if (!bridge.requestWritePermission || !bridge.requestWritePermission()) {
+          done("Permission not granted yet — allow storage access when Android asks, then tap the export again.");
+          return;
+        }
+      }
+    } catch (e) {}
+    var r = new FileReader();
+    r.onload = function(){
+      var b64 = String(r.result || "").split(",")[1] || "";
+      try {
+        var back = String(bridge.saveFileBase64(name, b64, blob.type || "application/octet-stream"));
+        if (back.indexOf("ERROR:") === 0) { done(back.slice(6)); return; }
+        done(null, back);
+      } catch (err) { done(String((err && err.message) || err)); }
+    };
+    r.onerror = function(){ done("Could not read the file data."); };
+    r.readAsDataURL(blob);
+    return;
+  }
+  // Browser fallback (PC testing): anchor click on an object URL.
   var a = document.createElement("a");
   a.href = URL.createObjectURL(blob); a.download = name;
   document.body.appendChild(a); a.click();
   setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+  done(null);
+}
+function download(name, text, type) {
+  downloadBlob(name, new Blob([text], { type: type || "text/plain;charset=utf-8" }), function(err){
+    status(err ? ("Download failed: " + err) : ("Saved '" + name + "' — check your phone's Downloads folder."));
+  });
 }
 
 function renderColToggles() {
@@ -1296,13 +1327,12 @@ $("btnCompare").addEventListener("click", function(){
 $("btnDocx").addEventListener("click", function(){
   if (!rows.length) { status("Nothing to export — import NX HTML first."); return; }
   try {
+    var name = (($("part").value || "camsheet") + "_sheet.docx").replace(/[\\/:*?"<>|]/g, "_");
     var blob = buildDocx();
-    var a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = ((($("part").value || "camsheet") + "_sheet.docx").replace(/[\\/:*?"<>|]/g, "_"));
-    document.body.appendChild(a); a.click();
-    setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 2000);
-    status("Word file downloaded (check Downloads) — opens in MS Word / WPS.");
+    status("Building Word file...");
+    downloadBlob(name, blob, function(err){
+      status(err ? ("Word export failed: " + err) : ("Saved '" + name + "' — check your phone's Downloads folder."));
+    });
   } catch (err) { status("Word export failed: " + err.message); }
 });
 $("descReset").addEventListener("click", function(){ customDesc = Object.assign({}, DEFAULT_DESC); refreshDescTable(); retransform(); });
@@ -1357,6 +1387,16 @@ function sheetHtml() {
 $("btnPrint").addEventListener("click", function(){
   if (!rows.length) { status("Nothing to print — import NX HTML first."); return; }
   $("sheet").innerHTML = sheetHtml();
+  var bridge = (typeof TurnAppNative !== "undefined") ? TurnAppNative : null;
+  if (bridge && bridge.printPage) {
+    try {
+      var back = String(bridge.printPage());
+      status(back.indexOf("ERROR:") === 0
+        ? ("Open print view failed: " + back.slice(6) + ". Use 'Download sheet (.html)' instead, then print from Chrome.")
+        : "Android print opened — choose 'Save as PDF' to make a PDF.");
+      return;
+    } catch (err) { status("Print failed: " + err.message); return; }
+  }
   window.print();
 });
 $("btnHtml").addEventListener("click", function(){
@@ -1391,7 +1431,7 @@ $("btnSave").addEventListener("click", function(){
     progFiles: progFiles.map(function(f){ return { name: f.name, text: f.text }; }),
     customDesc: customDesc, toolRule: toolRule, rows: rows };
   download((($("part").value || "camsheet") + ".camsheet.json").replace(/[\\/:*?"<>|]/g, "_"), JSON.stringify(proj, null, 1), "application/json");
-  status("Project saved (.json) — keep it to reopen later or on PC.");
+  status("Project saved (.json) — check your phone's Downloads folder; keep it to reopen later or on PC.");
 });
 $("btnLoadPick").addEventListener("click", function(){ $("projfile").click(); });
 $("projfile").addEventListener("change", function(e){
